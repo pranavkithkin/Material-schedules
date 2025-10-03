@@ -26,6 +26,7 @@ def create_app():
         ai_suggestions_bp,
         chat_bp
     )
+    from routes.uploads import uploads_bp
     
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(materials_bp, url_prefix='/api/materials')
@@ -34,6 +35,7 @@ def create_app():
     app.register_blueprint(deliveries_bp, url_prefix='/api/deliveries')
     app.register_blueprint(ai_suggestions_bp, url_prefix='/api/ai_suggestions')
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
+    app.register_blueprint(uploads_bp)
     
     # Create database tables
     with app.app_context():

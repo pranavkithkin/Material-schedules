@@ -10,6 +10,7 @@ from models.purchase_order import PurchaseOrder
 from models.payment import Payment
 from models.delivery import Delivery
 from models.ai_suggestion import AISuggestion
+from models.file import File
 from config import Config
 from datetime import datetime, timedelta
 
@@ -202,6 +203,7 @@ if __name__ == '__main__':
     
     # Check if user wants sample data
     with_samples = '--with-samples' in sys.argv or '-s' in sys.argv
+    skip_confirm = '-y' in sys.argv or '--yes' in sys.argv
     
     print("=" * 60)
     print("Material Delivery Dashboard - Database Initialization")
@@ -213,7 +215,10 @@ if __name__ == '__main__':
         print("\nMode: Initialize empty database")
         print("(Use --with-samples or -s flag to add sample data)")
     
-    confirm = input("\nProceed with database initialization? (yes/no): ")
+    if skip_confirm:
+        confirm = 'yes'
+    else:
+        confirm = input("\nProceed with database initialization? (yes/no): ")
     
     if confirm.lower() in ['yes', 'y']:
         init_database(with_sample_data=with_samples)

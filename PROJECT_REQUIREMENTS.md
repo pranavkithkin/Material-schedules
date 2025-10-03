@@ -178,6 +178,42 @@
 - All AI actions must be auditable
 - System should gracefully handle n8n being offline
 
+## PROJECT DEVELOPMENT RULES
+
+### Environment & Execution
+1. **ALWAYS use WSL terminal** for all Python/Git commands
+   - Use `wsl` command before running any Python scripts
+   - Activate venv in WSL: `source venv/bin/activate`
+   - Run all Flask/Python commands in WSL environment
+   - Execute Git commands through WSL (not PowerShell)
+
+### File Management
+2. **NEVER create "updated", "renewed", or versioned documentation files**
+   - Update existing files in-place (e.g., `COMPLETE_ROADMAP.md`)
+   - Do NOT create: `UPDATED_ROADMAP_N8N.md`, `COMPLETE_ROADMAP_V2.md`, etc.
+   - Keep ONE authoritative version of each document
+   - Use Git for version history, not multiple files
+
+3. **Consolidate documentation**
+   - One roadmap file: `COMPLETE_ROADMAP.md`
+   - One architecture file: `PROJECT_REQUIREMENTS.md` (this file)
+   - Delete redundant or duplicate documentation
+   - Update sections within existing files rather than creating new ones
+
+### Code Changes
+4. **Update, don't duplicate**
+   - Modify existing functions/classes in-place
+   - Don't create `function_v2()` or `new_function()` alongside old ones
+   - Replace old code, don't append alternatives
+   - Keep codebase clean and maintainable
+
+### Communication
+5. **Clear and concise**
+   - Provide direct answers without excessive explanations
+   - Show actual code/terminal output when relevant
+   - Summarize changes made rather than showing full file contents
+   - Focus on what matters to the user
+
 ---
 
 **Project Start Date**: October 3, 2025

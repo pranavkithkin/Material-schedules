@@ -641,21 +641,39 @@ Portal Data → AI Extraction (confidence: 45%) → Log as Low Confidence
 - ✅ Phase 2.3: AI Suggestions Review Interface
 
 ### IN PROGRESS:
-- 🔄 **Phase 1.4: Advanced AI Agent System** ← **YOU ARE HERE**
-  - Just created AI_AGENT_IMPLEMENTATION_PLAN.md
-  - Planning intelligent document extraction with conversation
-  - Email monitoring with auto-processing
-  - Natural language data entry with clarifications
-  - Multi-channel integration (Email, Chat, WhatsApp, File Upload)
+- 🔄 **Phase 1.4: File Upload Foundation** ← **YOU ARE HERE**
+  - Basic file upload/download system (no AI yet)
+  - Document storage infrastructure
+  - File management endpoints
+  
+- 🔄 **Phase 2.1: API Security**
+  - API key authentication for n8n
+  - Secure webhook endpoints
 
 ### PENDING:
-- ⏳ Phase 1.4a: Enhanced AI Service with conversation memory
-- ⏳ Phase 1.4b: Document upload interface with AI extraction
-- ⏳ Phase 1.4c: Conversational chat for data entry
-- ⏳ Phase 2.1: API Authentication (API keys for n8n)
-- ⏳ Phase 3: n8n Workflows (Email monitor, PDF processor)
-- ⏳ Phase 4: Enhanced Natural Language Chat (already basic version exists)
-- ⏳ Phase 5: Advanced Features (predictive alerts, reconciliation)
+- ⏳ Phase 2.2: n8n Webhook Endpoints (Dashboard side)
+  - `/n8n/ai-suggestion` - Receive AI extracted data
+  - `/n8n/conversation` - Handle chat messages
+  - `/n8n/clarification` - Process user clarifications
+  
+- ⏳ Phase 3: n8n AI Workflows (n8n side) 🤖 **NEW APPROACH**
+  - Email PO Monitor with Claude API
+  - Conversational AI Agent workflow
+  - Document Upload Processor
+  - Delivery Reminders (scheduled)
+  - Weekly Report Generator (scheduled)
+  
+- ⏳ Phase 4: Enhanced UI (Optional)
+  - Better AI suggestion review interface
+  - Document preview with extraction
+  - Chat interface improvements
+  
+- ⏳ Phase 5: Testing & Tuning
+  - End-to-end workflow testing
+  - AI accuracy optimization
+  - Error handling refinement
+
+**🎯 NEW ARCHITECTURE:** AI agents run in n8n (self-hosted), Dashboard provides data management + webhooks
 
 ---
 
