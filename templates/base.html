@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Material Delivery Dashboard{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pkp-green': '#006837',
+                        'pkp-gold': '#D4AF37',
+                        'pkp-gray': '#E5E5E5',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-pkp-gray">
+    <!-- Navigation -->
+    <nav class="bg-pkp-green text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between py-4">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-truck-loading text-2xl text-pkp-gold"></i>
+                    <h1 class="text-xl font-bold">Material Delivery Dashboard</h1>
+                </div>
+                
+                <div class="flex items-center space-x-6">
+                    <a href="/" class="hover:text-pkp-gold transition">
+                        <i class="fas fa-home mr-1"></i> Dashboard
+                    </a>
+                    <a href="/materials" class="hover:text-pkp-gold transition">
+                        <i class="fas fa-boxes mr-1"></i> Materials
+                    </a>
+                    <a href="/purchase_orders" class="hover:text-pkp-gold transition">
+                        <i class="fas fa-file-invoice mr-1"></i> Purchase Orders
+                    </a>
+                    <a href="/payments" class="hover:text-pkp-gold transition">
+                        <i class="fas fa-money-bill-wave mr-1"></i> Payments
+                    </a>
+                    <a href="/deliveries" class="hover:text-pkp-gold transition">
+                        <i class="fas fa-shipping-fast mr-1"></i> Deliveries
+                    </a>
+                    <a href="/ai_suggestions" class="hover:text-pkp-gold transition relative">
+                        <i class="fas fa-robot mr-1"></i> AI Suggestions
+                        <span id="ai-badge" class="hidden absolute -top-2 -right-2 bg-pkp-gold text-pkp-green text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold"></span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Chat Button -->
+    <button id="chat-btn" class="fixed bottom-6 right-6 bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white rounded-full p-4 shadow-lg transition z-50">
+        <i class="fas fa-comments text-2xl"></i>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="chat-panel" class="hidden fixed bottom-24 right-6 w-96 bg-white rounded-lg shadow-2xl z-50 border-2 border-pkp-green">
+        <div class="bg-pkp-green text-white p-4 rounded-t-lg flex justify-between items-center">
+            <h3 class="font-bold"><i class="fas fa-robot mr-2 text-pkp-gold"></i>AI Assistant</h3>
+            <button id="close-chat" class="hover:text-pkp-gold">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div id="chat-messages" class="h-96 overflow-y-auto p-4 space-y-3">
+            <div class="text-gray-500 text-sm text-center">
+                Ask me anything about your materials, deliveries, or payments!
+            </div>
+        </div>
+        
+        <div class="p-4 border-t">
+            <form id="chat-form" class="flex space-x-2">
+                <input 
+                    type="text" 
+                    id="chat-input" 
+                    placeholder="Type your question..." 
+                    class="flex-1 border border-pkp-green rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pkp-gold"
+                >
+                <button type="submit" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-4 py-2 rounded-lg transition">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-3 border-2 border-pkp-green">
+            <i class="fas fa-spinner fa-spin text-pkp-green text-2xl"></i>
+            <span class="text-gray-700">Loading...</span>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

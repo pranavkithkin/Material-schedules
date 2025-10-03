@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Payments - Material Delivery Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-bold text-pkp-green">
+            <i class="fas fa-credit-card mr-2 text-pkp-gold"></i>
+            Payment Tracking
+        </h2>
+        <button onclick="showAddModal()" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-6 py-3 rounded-lg transition font-semibold shadow-md">
+            <i class="fas fa-plus mr-2"></i>Add Payment
+        </button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-pkp-gold">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500 text-sm font-semibold">Total Paid</p>
+                    <p class="text-3xl font-bold text-green-600" id="total-paid">0</p>
+                </div>
+                <div class="bg-green-100 p-4 rounded-full">
+                    <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500 text-sm font-semibold">Pending</p>
+                    <p class="text-3xl font-bold text-yellow-600" id="total-pending">0</p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-full">
+                    <i class="fas fa-clock text-yellow-600 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-500 text-sm font-semibold">Total Payments</p>
+                    <p class="text-3xl font-bold text-blue-600" id="payment-count">0</p>
+                </div>
+                <div class="bg-blue-100 p-4 rounded-full">
+                    <i class="fas fa-list text-blue-600 text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead class="bg-gray-50 border-b">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Structure</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="payments-table-body" class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading payments...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Payment Modal -->
+<div id="payment-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-800" id="modal-title">Add Payment</h3>
+            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <form id="payment-form" class="space-y-4">
+            <input type="hidden" id="payment-id">
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Purchase Order *</label>
+                <select id="purchase-order-id" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="">Select purchase order...</option>
+                </select>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Structure *</label>
+                    <select id="payment-structure" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="Single Payment">Single Payment</option>
+                        <option value="Advance Payment">Advance Payment</option>
+                        <option value="Balance Payment">Balance Payment</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Amount *</label>
+                    <input type="number" id="payment-amount" step="0.01" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Status *</label>
+                    <select id="payment-status" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Failed">Failed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Date</label>
+                    <input type="date" id="payment-date" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Method</label>
+                    <input type="text" id="payment-method" placeholder="e.g., Bank Transfer, Cheque" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Reference Number</label>
+                    <input type="text" id="payment-reference" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Notes</label>
+                <textarea id="notes" rows="3" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-save mr-2"></i>Save Payment
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allPayments = [];
+
+function loadPayments() {
+    window.dashboardUtils.showLoading();
+    
+    $.ajax({
+        url: '/api/payments',
+        method: 'GET',
+        success: function(data) {
+            window.dashboardUtils.hideLoading();
+            allPayments = data;
+            displayPayments(data);
+            updateSummary(data);
+        },
+        error: function(err) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Error loading payments', 'error');
+        }
+    });
+}
+
+function updateSummary(payments) {
+    const totalPaid = payments
+        .filter(p => p.payment_status === 'Paid')
+        .reduce((sum, p) => sum + parseFloat(p.payment_amount), 0);
+    
+    const totalPending = payments
+        .filter(p => p.payment_status === 'Pending' || p.payment_status === 'Approved')
+        .reduce((sum, p) => sum + parseFloat(p.payment_amount), 0);
+    
+    $('#total-paid').text(window.dashboardUtils.formatCurrency(totalPaid) + ' AED');
+    $('#total-pending').text(window.dashboardUtils.formatCurrency(totalPending) + ' AED');
+    $('#payment-count').text(payments.length);
+}
+
+function displayPayments(payments) {
+    const tbody = $('#payments-table-body');
+    tbody.empty();
+    
+    if (payments.length === 0) {
+        tbody.html(`
+            <tr>
+                <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                    No payments found. Click "Add Payment" to get started.
+                </td>
+            </tr>
+        `);
+        return;
+    }
+    
+    payments.forEach(payment => {
+        const statusClass = getStatusClass(payment.payment_status);
+        const row = `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 font-semibold text-gray-800">${payment.purchase_order ? payment.purchase_order.po_number : '-'}</td>
+                <td class="px-6 py-4 text-gray-600">${payment.payment_structure}</td>
+                <td class="px-6 py-4 text-gray-800 font-semibold">${window.dashboardUtils.formatCurrency(payment.payment_amount)} AED</td>
+                <td class="px-6 py-4 text-gray-600">${payment.payment_percentage.toFixed(1)}%</td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">
+                        ${payment.payment_status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-gray-600 text-sm">${payment.payment_date ? window.dashboardUtils.formatDate(payment.payment_date) : '-'}</td>
+                <td class="px-6 py-4">
+                    <button onclick="editPayment(${payment.id})" class="text-purple-600 hover:text-purple-800 mr-3">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deletePayment(${payment.id})" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+function getStatusClass(status) {
+    const classes = {
+        'Pending': 'bg-yellow-100 text-yellow-800',
+        'Approved': 'bg-blue-100 text-blue-800',
+        'Paid': 'bg-green-100 text-green-800',
+        'Failed': 'bg-red-100 text-red-800',
+        'Cancelled': 'bg-gray-100 text-gray-800'
+    };
+    return classes[status] || 'bg-gray-100 text-gray-800';
+}
+
+function showAddModal() {
+    $('#modal-title').text('Add Payment');
+    $('#payment-form')[0].reset();
+    $('#payment-id').val('');
+    $('#payment-modal').removeClass('hidden');
+}
+
+function editPayment(id) {
+    const payment = allPayments.find(p => p.id === id);
+    if (!payment) return;
+    
+    $('#modal-title').text('Edit Payment');
+    $('#payment-id').val(payment.id);
+    $('#purchase-order-id').val(payment.purchase_order_id);
+    $('#payment-structure').val(payment.payment_structure);
+    $('#payment-amount').val(payment.payment_amount);
+    $('#payment-status').val(payment.payment_status);
+    $('#payment-date').val(payment.payment_date ? payment.payment_date.split('T')[0] : '');
+    $('#payment-method').val(payment.payment_method || '');
+    $('#payment-reference').val(payment.payment_reference || '');
+    $('#notes').val(payment.notes || '');
+    
+    $('#payment-modal').removeClass('hidden');
+}
+
+function closeModal() {
+    $('#payment-modal').addClass('hidden');
+}
+
+function deletePayment(id) {
+    if (!confirm('Are you sure you want to delete this payment?')) return;
+    
+    window.dashboardUtils.showLoading();
+    
+    $.ajax({
+        url: `/api/payments/${id}`,
+        method: 'DELETE',
+        success: function() {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Payment deleted successfully', 'success');
+            loadPayments();
+        },
+        error: function(err) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Error deleting payment', 'error');
+        }
+    });
+}
+
+$('#payment-form').on('submit', function(e) {
+    e.preventDefault();
+    
+    const id = $('#payment-id').val();
+    const data = {
+        purchase_order_id: parseInt($('#purchase-order-id').val()),
+        payment_structure: $('#payment-structure').val(),
+        payment_amount: parseFloat($('#payment-amount').val()),
+        payment_status: $('#payment-status').val(),
+        payment_date: $('#payment-date').val() || null,
+        payment_method: $('#payment-method').val(),
+        payment_reference: $('#payment-reference').val(),
+        notes: $('#notes').val(),
+        updated_by: 'Manual'
+    };
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/payments/${id}` : '/api/payments';
+    
+    window.dashboardUtils.showLoading();
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast(response.message, 'success');
+            closeModal();
+            loadPayments();
+        },
+        error: function(err) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Error saving payment', 'error');
+        }
+    });
+});
+
+// Load purchase orders for dropdown
+$.ajax({
+    url: '/api/purchase_orders',
+    method: 'GET',
+    success: function(pos) {
+        pos.forEach(po => {
+            $('#purchase-order-id').append(`<option value="${po.id}">${po.po_number} - ${po.supplier_name}</option>`);
+        });
+    }
+});
+
+// Initialize
+$(document).ready(function() {
+    loadPayments();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}Materials - Material Delivery Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-bold text-pkp-green">
+            <i class="fas fa-boxes mr-2 text-pkp-gold"></i>
+            Materials Management
+        </h2>
+        <button onclick="showAddModal()" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-6 py-3 rounded-lg transition font-semibold shadow-md">
+            <i class="fas fa-plus mr-2"></i>Add Material
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-pkp-gold">
+        <div class="flex items-center space-x-4">
+            <label class="text-gray-700 font-semibold">Filter:</label>
+            <select id="filter-status" class="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="all">All Status</option>
+                <option value="Approved">Approved</option>
+                <option value="Approved as Noted">Approved as Noted</option>
+                <option value="Pending">Pending</option>
+                <option value="Under Review">Under Review</option>
+                <option value="Revise & Resubmit">Revise & Resubmit</option>
+            </select>
+            
+            <input type="text" id="search-box" placeholder="Search materials..." 
+                   class="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1">
+            
+            <button onclick="loadMaterials()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Materials Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead class="bg-gray-50 border-b">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="materials-table-body" class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading materials...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Material Modal -->
+<div id="material-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-800" id="modal-title">Add Material</h3>
+            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <form id="material-form" class="space-y-4">
+            <input type="hidden" id="material-id">
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Material Type *</label>
+                <select id="material-type" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select material type...</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Description</label>
+                <textarea id="description" rows="3" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Approval Status *</label>
+                    <select id="approval-status" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Pending">Pending</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Approved as Noted">Approved as Noted</option>
+                        <option value="Revise & Resubmit">Revise & Resubmit</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Approval Date</label>
+                    <input type="date" id="approval-date" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Quantity</label>
+                    <input type="number" id="quantity" step="0.01" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Unit</label>
+                    <input type="text" id="unit" placeholder="e.g., meters, units, kg" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Submittal Reference</label>
+                    <input type="text" id="submittal-ref" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Specification Reference</label>
+                    <input type="text" id="specification-ref" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Approval Notes</label>
+                <textarea id="approval-notes" rows="2" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-6 py-2 rounded-lg transition shadow-md">
+                    <i class="fas fa-save mr-2"></i>Save Material
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allMaterials = [];
+
+function loadMaterials() {
+    window.dashboardUtils.showLoading();
+    
+    $.ajax({
+        url: '/api/materials',
+        method: 'GET',
+        success: function(data) {
+            window.dashboardUtils.hideLoading();
+            allMaterials = data;
+            displayMaterials(data);
+        },
+        error: function(err) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Error loading materials', 'error');
+        }
+    });
+}
+
+function displayMaterials(materials) {
+    const tbody = $('#materials-table-body');
+    tbody.empty();
+    
+    if (materials.length === 0) {
+        tbody.html(`
+            <tr>
+                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                    No materials found. Click "Add Material" to get started.
+                </td>
+            </tr>
+        `);
+        return;
+    }
+    
+    materials.forEach(material => {
+        const statusClass = getStatusClass(material.approval_status);
+        const row = `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 font-semibold text-gray-800">${material.material_type}</td>
+                <td class="px-6 py-4 text-gray-600">${material.description || '-'}</td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">
+                        ${material.approval_status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-gray-600">${material.quantity || '-'} ${material.unit || ''}</td>
+                <td class="px-6 py-4 text-gray-600 text-sm">${window.dashboardUtils.formatDate(material.updated_at)}</td>
+                <td class="px-6 py-4">
+                    <button onclick="editMaterial(${material.id})" class="text-blue-600 hover:text-blue-800 mr-3">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteMaterial(${material.id})" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+function getStatusClass(status) {
+    const classes = {
+        'Approved': 'bg-green-100 text-green-800',
+        'Approved as Noted': 'bg-blue-100 text-blue-800',
+        'Pending': 'bg-yellow-100 text-yellow-800',
+        'Under Review': 'bg-purple-100 text-purple-800',
+        'Revise & Resubmit': 'bg-red-100 text-red-800'
+    };
+    return classes[status] || 'bg-gray-100 text-gray-800';
+}
+
+function showAddModal() {
+    $('#modal-title').text('Add Material');
+    $('#material-form')[0].reset();
+    $('#material-id').val('');
+    $('#material-modal').removeClass('hidden');
+}
+
+function editMaterial(id) {
+    const material = allMaterials.find(m => m.id === id);
+    if (!material) return;
+    
+    $('#modal-title').text('Edit Material');
+    $('#material-id').val(material.id);
+    $('#material-type').val(material.material_type);
+    $('#description').val(material.description || '');
+    $('#approval-status').val(material.approval_status);
+    $('#approval-date').val(material.approval_date ? material.approval_date.split('T')[0] : '');
+    $('#quantity').val(material.quantity || '');
+    $('#unit').val(material.unit || '');
+    $('#submittal-ref').val(material.submittal_ref || '');
+    $('#specification-ref').val(material.specification_ref || '');
+    $('#approval-notes').val(material.approval_notes || '');
+    
+    $('#material-modal').removeClass('hidden');
+}
+
+function closeModal() {
+    $('#material-modal').addClass('hidden');
+}
+
+function deleteMaterial(id) {
+    if (!confirm('Are you sure you want to delete this material?')) return;
+    
+    window.dashboardUtils.showLoading();
+    
+    $.ajax({
+        url: `/api/materials/${id}`,
+        method: 'DELETE',
+        success: function() {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Material deleted successfully', 'success');
+            loadMaterials();
+        },
+        error: function(err) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Error deleting material', 'error');
+        }
+    });
+}
+
+$('#material-form').on('submit', function(e) {
+    e.preventDefault();
+    
+    const id = $('#material-id').val();
+    const data = {
+        material_type: $('#material-type').val(),
+        description: $('#description').val(),
+        approval_status: $('#approval-status').val(),
+        approval_date: $('#approval-date').val() || null,
+        quantity: parseFloat($('#quantity').val()) || null,
+        unit: $('#unit').val(),
+        submittal_ref: $('#submittal-ref').val(),
+        specification_ref: $('#specification-ref').val(),
+        approval_notes: $('#approval-notes').val(),
+        updated_by: 'Manual'
+    };
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/materials/${id}` : '/api/materials';
+    
+    window.dashboardUtils.showLoading();
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast(response.message, 'success');
+            closeModal();
+            loadMaterials();
+        },
+        error: function(err) {
+            window.dashboardUtils.hideLoading();
+            window.dashboardUtils.showToast('Error saving material', 'error');
+        }
+    });
+});
+
+// Load material types
+$.ajax({
+    url: '/api/materials/types',
+    method: 'GET',
+    success: function(types) {
+        types.forEach(type => {
+            $('#material-type').append(`<option value="${type}">${type}</option>`);
+        });
+    }
+});
+
+// Filter functionality
+$('#filter-status, #search-box').on('change keyup', function() {
+    const statusFilter = $('#filter-status').val();
+    const searchText = $('#search-box').val().toLowerCase();
+    
+    let filtered = allMaterials;
+    
+    if (statusFilter !== 'all') {
+        filtered = filtered.filter(m => m.approval_status === statusFilter);
+    }
+    
+    if (searchText) {
+        filtered = filtered.filter(m => 
+            m.material_type.toLowerCase().includes(searchText) ||
+            (m.description && m.description.toLowerCase().includes(searchText))
+        );
+    }
+    
+    displayMaterials(filtered);
+});
+
+// Initialize
+$(document).ready(function() {
+    loadMaterials();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+# Uploads Directory
+
+This directory stores uploaded documents:
+- Purchase Order PDFs
+- Invoices
+- Delivery notes
+- Submittal documents
+- Receipts
+
+Files are organized by type and date.
+
+**Note:** This directory is excluded from git (see .gitignore)
