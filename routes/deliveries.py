@@ -62,9 +62,7 @@ def create_delivery():
         delivery = Delivery(
             po_id=data.get('po_id'),
             delivery_status=data.get('delivery_status', 'Pending'),
-            ordered_quantity=data.get('ordered_quantity'),
-            delivered_quantity=data.get('delivered_quantity', 0),
-            unit=data.get('unit'),
+            delivery_percentage=data.get('delivery_percentage', 0),
             tracking_number=data.get('tracking_number'),
             carrier=data.get('carrier'),
             delivery_location=data.get('delivery_location'),
@@ -105,12 +103,8 @@ def update_delivery(id):
             delivery.po_id = data['po_id']
         if 'delivery_status' in data:
             delivery.delivery_status = data['delivery_status']
-        if 'ordered_quantity' in data:
-            delivery.ordered_quantity = data['ordered_quantity']
-        if 'delivered_quantity' in data:
-            delivery.delivered_quantity = data['delivered_quantity']
-        if 'unit' in data:
-            delivery.unit = data['unit']
+        if 'delivery_percentage' in data:
+            delivery.delivery_percentage = data['delivery_percentage']
         if 'tracking_number' in data:
             delivery.tracking_number = data['tracking_number']
         if 'carrier' in data:
@@ -125,6 +119,15 @@ def update_delivery(id):
             delivery.notes = data['notes']
         if 'delivery_note_path' in data:
             delivery.delivery_note_path = data['delivery_note_path']
+        # Sprint 2: Document Intelligence fields
+        if 'extracted_data' in data:
+            delivery.extracted_data = data['extracted_data']
+        if 'extraction_status' in data:
+            delivery.extraction_status = data['extraction_status']
+        if 'extraction_confidence' in data:
+            delivery.extraction_confidence = data['extraction_confidence']
+        if 'extracted_item_count' in data:
+            delivery.extracted_item_count = data['extracted_item_count']
         if 'expected_delivery_date' in data:
             delivery.expected_delivery_date = datetime.fromisoformat(data['expected_delivery_date']) if data['expected_delivery_date'] else None
         if 'actual_delivery_date' in data:

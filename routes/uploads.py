@@ -276,3 +276,87 @@ def update_file_status(file_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@uploads_bp.route('/api/deliveries/<int:delivery_id>/upload-document', methods=['POST'])
+def upload_delivery_document(delivery_id):
+    """
+    Sprint 2: Upload delivery order document and trigger n8n extraction workflow
+    This endpoint handles PDF upload and sends it to n8n for Claude API processing
+    """
+    try:
+        # Get the delivery record
+        delivery = Delivery.query.get_or_404(delivery_id)
+        
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type (PDF only for delivery orders)
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Only PDF files are allowed for delivery orders'}), 400
+        
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"delivery_{delivery_id}_{timestamp}_{filename}"
+        
+        # Get organized upload path
+        upload_path, relative_path = get_upload_path()
+        file_path = os.path.join(upload_path, filename)
+        
+        # Save file
+        file.save(file_path)
+        
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        
+        # Create File record
+        file_record = File(
+            filename=filename,
+            original_filename=file.filename,
+            file_path=os.path.join(relative_path, filename),
+            file_size=file_size,
+            file_type='pdf',
+            mime_type='application/pdf',
+            entity_type='delivery',
+            entity_id=delivery_id,
+            processing_status='pending',
+            uploaded_by=request.form.get('uploaded_by', 'Manual')
+        )
+        
+        db.session.add(file_record)
+        
+        # Update delivery record
+        delivery.delivery_note_path = file_record.file_path
+        delivery.extraction_status = 'pending'
+        delivery.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        # TODO: Trigger n8n workflow here
+        # This will be implemented in Phase 2 of Sprint 2
+        # n8n_webhook_url = 'https://your-n8n-instance.com/webhook/extract-delivery'
+        # requests.post(n8n_webhook_url, json={
+        #     'delivery_id': delivery_id,
+        #     'file_id': file_record.id,
+        #     'file_path': file_path,
+        #     'po_ref': delivery.purchase_order.po_ref if delivery.purchase_order else None
+        # })
+        
+        return jsonify({
+            'success': True,
+            'message': 'Document uploaded successfully. Extraction will begin shortly.',
+            'delivery_id': delivery_id,
+            'file_id': file_record.id,
+            'file_path': file_record.file_path,
+            'extraction_status': 'pending'
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

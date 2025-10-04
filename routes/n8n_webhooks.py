@@ -335,3 +335,116 @@ def health_check():
         'service': 'Material Delivery Dashboard API',
         'timestamp': datetime.now().isoformat()
     }), 200
+
+
+@n8n_bp.route('/delivery-extraction', methods=['POST'])
+@require_api_key
+def receive_delivery_extraction():
+    """
+    Sprint 2: Receive extracted delivery data from n8n + Claude API workflow.
+    
+    Expected JSON body:
+    {
+        "delivery_id": 1,
+        "file_id": 5,
+        "extraction_status": "completed",
+        "extraction_confidence": 92.5,
+        "extracted_data": {
+            "delivery_order_number": "DO-2025-001",
+            "delivery_date": "2025-01-15",
+            "items": [
+                {
+                    "item_description": "Shower Mixer - Model SM-500",
+                    "quantity": 20,
+                    "unit": "pcs",
+                    "delivered": true
+                },
+                {
+                    "item_description": "Basin Mixer - Model BM-300",
+                    "quantity": 15,
+                    "unit": "pcs",
+                    "delivered": true
+                }
+            ],
+            "total_items": 2,
+            "supplier": "ABC Sanitary Wares",
+            "notes": "All items inspected and accepted"
+        },
+        "error_message": null
+    }
+    
+    Returns:
+        200: Extraction data saved successfully
+        400: Invalid request data
+        404: Delivery not found
+        500: Server error
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['delivery_id', 'extraction_status']
+        missing_fields = [field for field in required_fields if field not in data]
+        
+        if missing_fields:
+            return jsonify({
+                'error': 'Missing required fields',
+                'missing_fields': missing_fields
+            }), 400
+        
+        # Get delivery record
+        delivery = Delivery.query.get_or_404(data['delivery_id'])
+        
+        # Update delivery with extraction results
+        delivery.extraction_status = data['extraction_status']
+        delivery.extraction_date = datetime.utcnow()
+        
+        if 'extracted_data' in data and data['extracted_data']:
+            delivery.extracted_data = data['extracted_data']
+            
+            # Extract item count from data
+            if 'items' in data['extracted_data']:
+                delivery.extracted_item_count = len(data['extracted_data']['items'])
+            elif 'total_items' in data['extracted_data']:
+                delivery.extracted_item_count = data['extracted_data']['total_items']
+        
+        if 'extraction_confidence' in data:
+            delivery.extraction_confidence = data['extraction_confidence']
+        
+        # If extraction completed successfully, auto-calculate delivery percentage
+        if data['extraction_status'] == 'completed' and delivery.extracted_data:
+            items = delivery.extracted_data.get('items', [])
+            if items:
+                delivered_items = sum(1 for item in items if item.get('delivered', False))
+                total_items = len(items)
+                if total_items > 0:
+                    delivery.delivery_percentage = round((delivered_items / total_items) * 100, 2)
+                    
+                    # Auto-update status based on percentage
+                    if delivery.delivery_percentage == 100:
+                        delivery.delivery_status = 'Delivered'
+                    elif delivery.delivery_percentage > 0:
+                        delivery.delivery_status = 'Partial'
+        
+        delivery.updated_at = datetime.utcnow()
+        delivery.updated_by = 'AI'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Extraction data saved successfully',
+            'delivery_id': delivery.id,
+            'extraction_status': delivery.extraction_status,
+            'extraction_confidence': delivery.extraction_confidence,
+            'extracted_item_count': delivery.extracted_item_count,
+            'delivery_percentage': delivery.delivery_percentage,
+            'delivery_status': delivery.delivery_status
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Failed to save extraction data',
+            'message': str(e)
+        }), 500

@@ -200,6 +200,8 @@ Include comprehensive error handling and validation."
 ### PHASE 2: API Security & AI Agent (Week 2-3)
 **Goal:** Smart document processing and conversational data entry
 
+> **📋 DETAILED AI AGENT SYSTEM:** See [AI Agents Roadmap](AI_AGENTS_ROADMAP.md) for complete agent specifications, priorities, and implementation plan
+
 #### Step 2.1: API Authentication ✅ COMPLETE
 - API key authentication system (routes/auth.py)
 - 7 n8n webhook endpoints created
@@ -207,6 +209,7 @@ Include comprehensive error handling and validation."
 - Documentation complete
 
 #### Step 2.2: AI Document Extraction Service (NEXT)
+**📋 See:** [AI Agents Roadmap](AI_AGENTS_ROADMAP.md#sprint-2-week-2-document-processing) - Sprint 2
 **What to ask Claude:**
 ```
 "Create AI agent service (services/ai_agent.py) that:
@@ -235,6 +238,8 @@ Integration:
 ```
 
 #### Step 2.3: Enhanced Chat Interface
+**📋 See:** [AI Agents Roadmap](AI_AGENTS_ROADMAP.md#sprint-3-week-3-conversational-ai) - Sprint 3
+
 **What to ask Claude:**
 ```
 "Enhance chat service (services/chat_service.py) for natural language data entry:
@@ -274,6 +279,8 @@ Include conversation persistence, context awareness, and error handling."
 
 ### PHASE 3: n8n Automation Workflows (Week 3-4)
 **Goal:** Automated workflows for reminders and notifications
+
+> **📋 DETAILED AUTOMATION AGENTS:** See [AI Agents Roadmap](AI_AGENTS_ROADMAP.md#sprint-5-week-5-automation--reminders) - Sprint 5
 
 #### Step 3.1: Delivery Reminder Workflow
 **What to ask Claude:**
@@ -563,6 +570,8 @@ Portal Data → AI Extraction (confidence: 45%) → Log as Low Confidence
 
 ### PHASE 5: Email Monitor Workflow (OPTIONAL - Final Phase)
 **Goal:** Automated email parsing for unstructured supplier communications
+
+> **📋 DETAILED EMAIL AGENT:** See [AI Agents Roadmap](AI_AGENTS_ROADMAP.md#sprint-7-optional---week-7-email-integration) - Sprint 7 (Optional)
 
 **Note:** This is moved to the end because emails are often unstructured and parsing them requires significant effort for limited value. Prioritize manual upload + AI extraction first.
 

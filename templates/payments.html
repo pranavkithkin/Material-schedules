@@ -119,12 +119,11 @@
             
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Payment Status *</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Type *</label>
                     <select id="payment-status" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="Full">Full Payment</option>
+                        <option value="Partial">Partial Payment</option>
                         <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Failed">Failed</option>
                         <option value="Cancelled">Cancelled</option>
                     </select>
                 </div>
@@ -132,6 +131,14 @@
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Payment Date</label>
                     <input type="date" id="payment-date" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+            
+            <!-- Payment Terms (from PO) - Read Only -->
+            <div id="payment-terms-container" class="hidden">
+                <label class="block text-gray-700 font-semibold mb-2">Payment Terms (from PO)</label>
+                <div id="payment-terms-display" class="w-full border rounded-lg px-3 py-2 bg-gray-50 text-gray-700 min-h-[40px]">
+                    Select a PO to view payment terms
                 </div>
             </div>
             
@@ -152,12 +159,18 @@
                 <textarea id="notes" rows="3" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
             </div>
             
+            <!-- Validation Results Section (Sprint 1) -->
+            <div id="validation-results" class="hidden"></div>
+            
             <div class="flex justify-end space-x-3 pt-4">
                 <button type="button" onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
                     Cancel
                 </button>
-                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition">
-                    <i class="fas fa-save mr-2"></i>Save Payment
+                <button type="button" onclick="validateAndSave()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-check-circle mr-2"></i>Validate & Save
+                </button>
+                <button type="button" id="force-save-btn" onclick="forceSave()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Save Anyway
                 </button>
             </div>
         </form>
@@ -190,12 +203,12 @@ function loadPayments() {
 
 function updateSummary(payments) {
     const totalPaid = payments
-        .filter(p => p.payment_status === 'Paid')
-        .reduce((sum, p) => sum + parseFloat(p.payment_amount), 0);
+        .filter(p => p.payment_status === 'Paid' || p.payment_status === 'Completed')
+        .reduce((sum, p) => sum + parseFloat(p.paid_amount || p.total_amount || 0), 0);
     
     const totalPending = payments
         .filter(p => p.payment_status === 'Pending' || p.payment_status === 'Approved')
-        .reduce((sum, p) => sum + parseFloat(p.payment_amount), 0);
+        .reduce((sum, p) => sum + parseFloat(p.paid_amount || p.total_amount || 0), 0);
     
     $('#total-paid').text(window.dashboardUtils.formatCurrency(totalPaid) + ' AED');
     $('#total-pending').text(window.dashboardUtils.formatCurrency(totalPending) + ' AED');
@@ -219,12 +232,14 @@ function displayPayments(payments) {
     
     payments.forEach(payment => {
         const statusClass = getStatusClass(payment.payment_status);
+        const amount = payment.paid_amount || payment.total_amount || 0;
+        const percentage = payment.payment_percentage || 0;
         const row = `
             <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 font-semibold text-gray-800">${payment.purchase_order ? payment.purchase_order.po_number : '-'}</td>
+                <td class="px-6 py-4 font-semibold text-gray-800">${payment.po_ref || '-'}</td>
                 <td class="px-6 py-4 text-gray-600">${payment.payment_structure}</td>
-                <td class="px-6 py-4 text-gray-800 font-semibold">${window.dashboardUtils.formatCurrency(payment.payment_amount)} AED</td>
-                <td class="px-6 py-4 text-gray-600">${payment.payment_percentage.toFixed(1)}%</td>
+                <td class="px-6 py-4 text-gray-800 font-semibold">${window.dashboardUtils.formatCurrency(amount)} ${payment.currency || 'AED'}</td>
+                <td class="px-6 py-4 text-gray-600">${percentage.toFixed(1)}%</td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">
                         ${payment.payment_status}
@@ -250,6 +265,8 @@ function getStatusClass(status) {
         'Pending': 'bg-yellow-100 text-yellow-800',
         'Approved': 'bg-blue-100 text-blue-800',
         'Paid': 'bg-green-100 text-green-800',
+        'Completed': 'bg-green-100 text-green-800',
+        'Partial': 'bg-orange-100 text-orange-800',
         'Failed': 'bg-red-100 text-red-800',
         'Cancelled': 'bg-gray-100 text-gray-800'
     };
@@ -269,13 +286,13 @@ function editPayment(id) {
     
     $('#modal-title').text('Edit Payment');
     $('#payment-id').val(payment.id);
-    $('#purchase-order-id').val(payment.purchase_order_id);
+    $('#purchase-order-id').val(payment.po_id);
     $('#payment-structure').val(payment.payment_structure);
-    $('#payment-amount').val(payment.payment_amount);
+    $('#payment-amount').val(payment.paid_amount || payment.total_amount);
     $('#payment-status').val(payment.payment_status);
     $('#payment-date').val(payment.payment_date ? payment.payment_date.split('T')[0] : '');
     $('#payment-method').val(payment.payment_method || '');
-    $('#payment-reference').val(payment.payment_reference || '');
+    $('#payment-reference').val(payment.payment_ref || payment.invoice_ref || '');
     $('#notes').val(payment.notes || '');
     
     $('#payment-modal').removeClass('hidden');
@@ -283,6 +300,8 @@ function editPayment(id) {
 
 function closeModal() {
     $('#payment-modal').addClass('hidden');
+    $('#validation-results').addClass('hidden').empty();
+    $('#force-save-btn').addClass('hidden');
 }
 
 function deletePayment(id) {
@@ -305,18 +324,187 @@ function deletePayment(id) {
     });
 }
 
-$('#payment-form').on('submit', function(e) {
-    e.preventDefault();
+// Validate and Save function (Sprint 1 Integration)
+async function validateAndSave() {
+    const id = $('#payment-id').val();
+    const isEdit = !!id;
     
+    const data = {
+        invoice_ref: $('#payment-reference').val(),
+        payment_ref: $('#payment-reference').val(),
+        payment_date: $('#payment-date').val(),
+        total_amount: parseFloat($('#payment-amount').val()),
+        po_id: parseInt($('#purchase-order-id').val())
+    };
+    
+    // Show validating message
+    $('#validation-results').removeClass('hidden').html(`
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+            <div class="flex items-center">
+                <i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>
+                <span class="text-blue-700 text-sm">Validating payment with AI agent...</span>
+            </div>
+        </div>
+    `);
+    
+    try {
+        const response = await fetch('/api/agents/validate-and-check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': '{{ config.N8N_TO_FLASK_API_KEY or "" }}'
+            },
+            body: JSON.stringify({
+                record_type: 'invoice',
+                data: data,
+                check_duplicates: !isEdit  // Only check duplicates for new records
+            })
+        });
+        
+        const result = await response.json();
+        displayValidationResults(result, isEdit);
+        
+    } catch (error) {
+        $('#validation-results').removeClass('hidden').html(`
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                    <span class="text-red-700 text-sm">Validation error: ${error.message}</span>
+                </div>
+            </div>
+        `);
+    }
+}
+
+function displayValidationResults(result, isEdit) {
+    const resultsDiv = $('#validation-results');
+    let html = '';
+    
+    // Performance badge
+    const perfBadge = `<span class="text-xs text-gray-500 ml-2">⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage} tokens</span>`;
+    
+    // Check if valid and no duplicates
+    if (result.is_valid && result.duplicates.length === 0) {
+        html = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-500 text-lg mr-2"></i>
+                        <span class="text-green-800 font-semibold">✅ Validation Passed!</span>
+                        ${perfBadge}
+                    </div>
+                </div>
+                <p class="text-green-700 text-sm mt-1">Payment validated successfully. Ready to save.</p>
+            </div>
+        `;
+        resultsDiv.removeClass('hidden').html(html);
+        // Auto-save after 1 second if validation passes
+        setTimeout(() => savePayment(), 1000);
+        return;
+    }
+    
+    // Show errors
+    if (result.errors && result.errors.length > 0) {
+        html += `
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                    <span class="text-red-800 font-semibold">❌ Validation Errors</span>
+                    ${perfBadge}
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.errors.map(err => `<li class="text-red-700 text-sm">• ${err}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    // Show warnings
+    if (result.warnings && result.warnings.length > 0) {
+        html += `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                    <span class="text-yellow-800 font-semibold">⚠️ Warnings</span>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.warnings.map(warn => `<li class="text-yellow-700 text-sm">• ${warn}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    // Show duplicates
+    if (result.duplicates && result.duplicates.length > 0) {
+        html += `
+            <div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-copy text-orange-500 mr-2"></i>
+                    <span class="text-orange-800 font-semibold">🔍 Duplicate Payment Detected! (${result.duplicates.length})</span>
+                </div>
+                <div class="mt-2 space-y-2">
+                    ${result.duplicates.map(dup => `
+                        <div class="bg-white rounded p-2 text-sm">
+                            <div class="flex justify-between items-start">
+                                <span class="font-semibold text-orange-900">${dup.match_type}</span>
+                                <span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                                    ${Math.round(dup.confidence * 100)}% match
+                                </span>
+                            </div>
+                            <p class="text-orange-700 mt-1">${dup.reason}</p>
+                            ${dup.amount ? `<p class="text-orange-600 text-xs mt-1">Amount: AED ${dup.amount.toLocaleString()}</p>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <p class="text-orange-700 text-xs mt-2">
+                    <i class="fas fa-exclamation-circle mr-1"></i>
+                    This might be a duplicate payment. Review carefully before saving!
+                </p>
+            </div>
+        `;
+    }
+    
+    // Show matched PO info
+    if (result.matched_lpo) {
+        html += `
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-link text-blue-500 mr-2"></i>
+                    <span class="text-blue-800 font-semibold">✅ Matched to PO</span>
+                </div>
+                <p class="text-blue-700 text-sm mt-1">
+                    Linked to: <strong>${result.matched_lpo.po_ref}</strong> 
+                    (${result.matched_lpo.supplier_name})
+                </p>
+                <p class="text-blue-600 text-xs mt-1">
+                    PO Amount: AED ${result.matched_lpo.total_amount.toLocaleString()}
+                </p>
+            </div>
+        `;
+    }
+    
+    resultsDiv.removeClass('hidden').html(html);
+    
+    // Show "Save Anyway" button if there are duplicates or only warnings (no errors)
+    if (result.duplicates.length > 0 || (result.is_valid && result.warnings.length > 0)) {
+        $('#force-save-btn').removeClass('hidden');
+    } else {
+        $('#force-save-btn').addClass('hidden');
+    }
+}
+
+function savePayment() {
     const id = $('#payment-id').val();
     const data = {
-        purchase_order_id: parseInt($('#purchase-order-id').val()),
+        po_id: parseInt($('#purchase-order-id').val()),
         payment_structure: $('#payment-structure').val(),
-        payment_amount: parseFloat($('#payment-amount').val()),
+        paid_amount: parseFloat($('#payment-amount').val()),
+        total_amount: parseFloat($('#payment-amount').val()),
         payment_status: $('#payment-status').val(),
         payment_date: $('#payment-date').val() || null,
         payment_method: $('#payment-method').val(),
-        payment_reference: $('#payment-reference').val(),
+        payment_ref: $('#payment-reference').val(),
+        invoice_ref: $('#payment-reference').val(),
         notes: $('#notes').val(),
         updated_by: 'Manual'
     };
@@ -342,16 +530,49 @@ $('#payment-form').on('submit', function(e) {
             window.dashboardUtils.showToast('Error saving payment', 'error');
         }
     });
+}
+
+function forceSave() {
+    if (confirm('⚠️ Are you sure you want to save this payment despite the warnings/duplicates?\n\nThis might create a duplicate payment in the system.')) {
+        savePayment();
+    }
+}
+
+// Keep the old form submit handler for compatibility
+$('#payment-form').on('submit', function(e) {
+    e.preventDefault();
+    validateAndSave();
 });
+
+// Store PO data for reference
+let purchaseOrders = [];
 
 // Load purchase orders for dropdown
 $.ajax({
     url: '/api/purchase_orders',
     method: 'GET',
     success: function(pos) {
+        purchaseOrders = pos;
         pos.forEach(po => {
-            $('#purchase-order-id').append(`<option value="${po.id}">${po.po_number} - ${po.supplier_name}</option>`);
+            $('#purchase-order-id').append(`<option value="${po.id}">${po.po_ref} - ${po.supplier_name}</option>`);
         });
+    }
+});
+
+// Handle PO selection to show payment terms
+$('#purchase-order-id').on('change', function() {
+    const poId = parseInt($(this).val());
+    if (poId) {
+        const selectedPO = purchaseOrders.find(po => po.id === poId);
+        if (selectedPO && selectedPO.payment_terms) {
+            $('#payment-terms-container').removeClass('hidden');
+            $('#payment-terms-display').text(selectedPO.payment_terms);
+        } else {
+            $('#payment-terms-container').removeClass('hidden');
+            $('#payment-terms-display').text('No payment terms specified for this PO');
+        }
+    } else {
+        $('#payment-terms-container').addClass('hidden');
     }
 });
 

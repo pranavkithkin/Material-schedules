@@ -32,14 +32,22 @@ class ChatService:
         self.anthropic_client = None
         self.openai_client = None
         
-        # Initialize Claude if available
+        # Initialize Claude if available (with error handling)
         if ANTHROPIC_AVAILABLE and Config.ANTHROPIC_API_KEY:
-            self.anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+            try:
+                self.anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+            except Exception as e:
+                print(f"Warning: Could not initialize Anthropic client: {e}")
+                print("Chat service will work with limited functionality")
         
-        # Initialize OpenAI if available
+        # Initialize OpenAI if available (with error handling)
         if OPENAI_AVAILABLE and Config.OPENAI_API_KEY:
-            openai.api_key = Config.OPENAI_API_KEY
-            self.openai_client = openai
+            try:
+                openai.api_key = Config.OPENAI_API_KEY
+                self.openai_client = openai
+            except Exception as e:
+                print(f"Warning: Could not initialize OpenAI client: {e}")
+                print("Chat service will work with limited functionality")
     
     def process_query(self, query):
         """Process a natural language query"""

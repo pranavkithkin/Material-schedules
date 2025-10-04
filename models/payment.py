@@ -20,6 +20,9 @@ class Payment(db.Model):
     payment_percentage = db.Column(db.Float, default=0)
     payment_date = db.Column(db.DateTime)
     
+    # Payment Terms (from PO)
+    payment_terms = db.Column(db.Text)  # Copied from PO for reference
+    
     # Additional Details
     payment_ref = db.Column(db.String(100))
     invoice_ref = db.Column(db.String(100))
@@ -27,7 +30,7 @@ class Payment(db.Model):
     currency = db.Column(db.String(10), default='AED')
     
     # Status
-    payment_status = db.Column(db.String(50), default='Pending')  # Pending, Completed, Partial
+    payment_status = db.Column(db.String(50), default='Pending')  # Pending, Completed, Full, Partial
     
     # Notes
     notes = db.Column(db.Text)

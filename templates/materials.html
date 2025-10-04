@@ -108,13 +108,17 @@
             
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Quantity</label>
-                    <input type="number" id="quantity" step="0.01" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-gray-700 font-semibold mb-2">Revision Number</label>
+                    <input type="number" id="revision-number" value="0" min="0" class="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+                    <p class="text-xs text-gray-500 mt-1">Rev 0 = Initial submittal. Increments automatically on resubmission.</p>
                 </div>
                 
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Unit</label>
-                    <input type="text" id="unit" placeholder="e.g., meters, units, kg" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div id="previous-submittal-container" class="hidden">
+                    <label class="block text-gray-700 font-semibold mb-2">Previous Submittal</label>
+                    <select id="previous-submittal-id" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">None (New submittal)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Link this resubmission to previous version</p>
                 </div>
             </div>
             
@@ -135,12 +139,18 @@
                 <textarea id="approval-notes" rows="2" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             </div>
             
+            <!-- Validation Results Section (Sprint 1) -->
+            <div id="validation-results" class="hidden"></div>
+            
             <div class="flex justify-end space-x-3 pt-4">
                 <button type="button" onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
                     Cancel
                 </button>
-                <button type="submit" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-6 py-2 rounded-lg transition shadow-md">
-                    <i class="fas fa-save mr-2"></i>Save Material
+                <button type="button" onclick="validateAndSave()" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-6 py-2 rounded-lg transition shadow-md">
+                    <i class="fas fa-check-circle mr-2"></i>Validate & Save
+                </button>
+                <button type="button" id="force-save-btn" onclick="forceSave()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Save Anyway
                 </button>
             </div>
         </form>
@@ -251,6 +261,8 @@ function editMaterial(id) {
 
 function closeModal() {
     $('#material-modal').addClass('hidden');
+    $('#validation-results').addClass('hidden').empty();
+    $('#force-save-btn').addClass('hidden');
 }
 
 function deleteMaterial(id) {
@@ -273,9 +285,145 @@ function deleteMaterial(id) {
     });
 }
 
-$('#material-form').on('submit', function(e) {
-    e.preventDefault();
+// Validate and Save function (Sprint 1 Integration)
+async function validateAndSave() {
+    const id = $('#material-id').val();
+    const isEdit = !!id;
     
+    const data = {
+        material_id: id || null,
+        material_type: $('#material-type').val(),
+        description: $('#description').val(),
+        date_submitted: $('#approval-date').val(),
+        status: $('#approval-status').val()
+    };
+    
+    // Show validating message
+    $('#validation-results').removeClass('hidden').html(`
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+            <div class="flex items-center">
+                <i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>
+                <span class="text-blue-700 text-sm">Validating material with AI agent...</span>
+            </div>
+        </div>
+    `);
+    
+    try {
+        const response = await fetch('/api/agents/validate-and-check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': '{{ config.N8N_TO_FLASK_API_KEY or "" }}'
+            },
+            body: JSON.stringify({
+                record_type: 'submittal',
+                data: data,
+                check_duplicates: !isEdit
+            })
+        });
+        
+        const result = await response.json();
+        displayValidationResults(result, isEdit);
+        
+    } catch (error) {
+        $('#validation-results').removeClass('hidden').html(`
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                    <span class="text-red-700 text-sm">Validation error: ${error.message}</span>
+                </div>
+            </div>
+        `);
+    }
+}
+
+function displayValidationResults(result, isEdit) {
+    const resultsDiv = $('#validation-results');
+    let html = '';
+    
+    const perfBadge = `<span class="text-xs text-gray-500 ml-2">⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage} tokens</span>`;
+    
+    if (result.is_valid && result.duplicates.length === 0) {
+        html = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-500 text-lg mr-2"></i>
+                        <span class="text-green-800 font-semibold">✅ Validation Passed!</span>
+                        ${perfBadge}
+                    </div>
+                </div>
+                <p class="text-green-700 text-sm mt-1">Material validated successfully. Ready to save.</p>
+            </div>
+        `;
+        resultsDiv.removeClass('hidden').html(html);
+        setTimeout(() => saveMaterial(), 1000);
+        return;
+    }
+    
+    if (result.errors && result.errors.length > 0) {
+        html += `
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                    <span class="text-red-800 font-semibold">❌ Validation Errors</span>
+                    ${perfBadge}
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.errors.map(err => `<li class="text-red-700 text-sm">• ${err}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    if (result.warnings && result.warnings.length > 0) {
+        html += `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                    <span class="text-yellow-800 font-semibold">⚠️ Warnings</span>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.warnings.map(warn => `<li class="text-yellow-700 text-sm">• ${warn}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    if (result.duplicates && result.duplicates.length > 0) {
+        html += `
+            <div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-copy text-orange-500 mr-2"></i>
+                    <span class="text-orange-800 font-semibold">🔍 Potential Duplicates (${result.duplicates.length})</span>
+                </div>
+                <div class="mt-2 space-y-2">
+                    ${result.duplicates.map(dup => `
+                        <div class="bg-white rounded p-2 text-sm">
+                            <div class="flex justify-between items-start">
+                                <span class="font-semibold text-orange-900">${dup.match_type}</span>
+                                <span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                                    ${Math.round(dup.confidence * 100)}% match
+                                </span>
+                            </div>
+                            <p class="text-orange-700 mt-1">${dup.reason}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    resultsDiv.removeClass('hidden').html(html);
+    
+    if (result.duplicates.length > 0 || (result.is_valid && result.warnings.length > 0)) {
+        $('#force-save-btn').removeClass('hidden');
+    } else {
+        $('#force-save-btn').addClass('hidden');
+    }
+}
+
+function saveMaterial() {
     const id = $('#material-id').val();
     const data = {
         material_type: $('#material-type').val(),
@@ -311,6 +459,17 @@ $('#material-form').on('submit', function(e) {
             window.dashboardUtils.showToast('Error saving material', 'error');
         }
     });
+}
+
+function forceSave() {
+    if (confirm('Are you sure you want to save despite the warnings/duplicates?')) {
+        saveMaterial();
+    }
+}
+
+$('#material-form').on('submit', function(e) {
+    e.preventDefault();
+    validateAndSave();
 });
 
 // Load material types

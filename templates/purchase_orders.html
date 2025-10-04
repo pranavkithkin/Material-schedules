@@ -154,12 +154,18 @@
                 <textarea id="notes" rows="3" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
             </div>
             
+            <!-- Validation Results Section (Sprint 1) -->
+            <div id="validation-results" class="hidden"></div>
+            
             <div class="flex justify-end space-x-3 pt-4">
                 <button type="button" onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
                     Cancel
                 </button>
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
-                    <i class="fas fa-save mr-2"></i>Save Purchase Order
+                <button type="button" onclick="validateAndSave()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-check-circle mr-2"></i>Validate & Save
+                </button>
+                <button type="button" id="force-save-btn" onclick="forceSave()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Save Anyway
                 </button>
             </div>
         </form>
@@ -208,16 +214,16 @@ function displayPOs(pos) {
         const statusClass = getStatusClass(po.po_status);
         const row = `
             <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 font-semibold text-gray-800">${po.po_number}</td>
+                <td class="px-6 py-4 font-semibold text-gray-800">${po.po_ref}</td>
                 <td class="px-6 py-4 text-gray-600">${po.material ? po.material.material_type : '-'}</td>
                 <td class="px-6 py-4 text-gray-600">${po.supplier_name}</td>
-                <td class="px-6 py-4 text-gray-800 font-semibold">${window.dashboardUtils.formatCurrency(po.po_amount)} ${po.currency}</td>
+                <td class="px-6 py-4 text-gray-800 font-semibold">${window.dashboardUtils.formatCurrency(po.total_amount)} ${po.currency}</td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">
                         ${po.po_status}
                     </span>
                 </td>
-                <td class="px-6 py-4 text-gray-600 text-sm">${window.dashboardUtils.formatDate(po.issue_date)}</td>
+                <td class="px-6 py-4 text-gray-600 text-sm">${window.dashboardUtils.formatDate(po.po_date)}</td>
                 <td class="px-6 py-4">
                     <button onclick="editPO(${po.id})" class="text-green-600 hover:text-green-800 mr-3">
                         <i class="fas fa-edit"></i>
@@ -260,15 +266,14 @@ function editPO(id) {
     
     $('#modal-title').text('Edit Purchase Order');
     $('#po-id').val(po.id);
-    $('#po-number').val(po.po_number);
+    $('#po-number').val(po.po_ref);  // Fixed: was po.po_number
     $('#material-id').val(po.material_id || '');
     $('#supplier-name').val(po.supplier_name);
     $('#supplier-contact').val(po.supplier_contact || '');
     $('#supplier-email').val(po.supplier_email || '');
-    $('#po-amount').val(po.po_amount);
+    $('#po-amount').val(po.total_amount);  // Fixed: was po.po_amount
     $('#currency').val(po.currency);
-    $('#issue-date').val(po.issue_date ? po.issue_date.split('T')[0] : '');
-    $('#expected-delivery-date').val(po.expected_delivery_date ? po.expected_delivery_date.split('T')[0] : '');
+    $('#issue-date').val(po.po_date ? po.po_date.split('T')[0] : '');  // Fixed: was po.issue_date
     $('#po-status').val(po.po_status);
     $('#notes').val(po.notes || '');
     
@@ -277,6 +282,8 @@ function editPO(id) {
 
 function closeModal() {
     $('#po-modal').addClass('hidden');
+    $('#validation-results').addClass('hidden').empty();
+    $('#force-save-btn').addClass('hidden');
 }
 
 function deletePO(id) {
@@ -299,20 +306,166 @@ function deletePO(id) {
     });
 }
 
-$('#po-form').on('submit', function(e) {
-    e.preventDefault();
+// Validate and Save function (Sprint 1 Integration)
+async function validateAndSave() {
+    const id = $('#po-id').val();
+    const isEdit = !!id;
     
+    const data = {
+        material_id: parseInt($('#material-id').val()) || null,
+        lpo_number: $('#po-number').val(),
+        supplier_name: $('#supplier-name').val(),
+        release_date: $('#issue-date').val(),
+        amount: parseFloat($('#po-amount').val())
+    };
+    
+    // Show validating message
+    $('#validation-results').removeClass('hidden').html(`
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+            <div class="flex items-center">
+                <i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>
+                <span class="text-blue-700 text-sm">Validating with AI agent...</span>
+            </div>
+        </div>
+    `);
+    
+    try {
+        const response = await fetch('/api/agents/validate-and-check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': '{{ config.N8N_TO_FLASK_API_KEY or "" }}'
+            },
+            body: JSON.stringify({
+                record_type: 'lpo_release',
+                data: data,
+                check_duplicates: !isEdit  // Only check duplicates for new records
+            })
+        });
+        
+        const result = await response.json();
+        displayValidationResults(result, isEdit);
+        
+    } catch (error) {
+        $('#validation-results').removeClass('hidden').html(`
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                    <span class="text-red-700 text-sm">Validation error: ${error.message}</span>
+                </div>
+            </div>
+        `);
+    }
+}
+
+function displayValidationResults(result, isEdit) {
+    const resultsDiv = $('#validation-results');
+    let html = '';
+    
+    // Performance badge
+    const perfBadge = `<span class="text-xs text-gray-500 ml-2">⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage} tokens</span>`;
+    
+    // Check if valid and no duplicates
+    if (result.is_valid && result.duplicates.length === 0) {
+        html = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-500 text-lg mr-2"></i>
+                        <span class="text-green-800 font-semibold">✅ Validation Passed!</span>
+                        ${perfBadge}
+                    </div>
+                </div>
+                <p class="text-green-700 text-sm mt-1">All checks passed. Ready to save.</p>
+            </div>
+        `;
+        resultsDiv.removeClass('hidden').html(html);
+        // Auto-save after 1 second if validation passes
+        setTimeout(() => savePO(), 1000);
+        return;
+    }
+    
+    // Show errors
+    if (result.errors && result.errors.length > 0) {
+        html += `
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                    <span class="text-red-800 font-semibold">❌ Validation Errors</span>
+                    ${perfBadge}
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.errors.map(err => `<li class="text-red-700 text-sm">• ${err}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    // Show warnings
+    if (result.warnings && result.warnings.length > 0) {
+        html += `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                    <span class="text-yellow-800 font-semibold">⚠️ Warnings</span>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.warnings.map(warn => `<li class="text-yellow-700 text-sm">• ${warn}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    // Show duplicates
+    if (result.duplicates && result.duplicates.length > 0) {
+        html += `
+            <div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-copy text-orange-500 mr-2"></i>
+                    <span class="text-orange-800 font-semibold">🔍 Potential Duplicates (${result.duplicates.length})</span>
+                </div>
+                <div class="mt-2 space-y-2">
+                    ${result.duplicates.map(dup => `
+                        <div class="bg-white rounded p-2 text-sm">
+                            <div class="flex justify-between items-start">
+                                <span class="font-semibold text-orange-900">${dup.match_type}</span>
+                                <span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                                    ${Math.round(dup.confidence * 100)}% match
+                                </span>
+                            </div>
+                            <p class="text-orange-700 mt-1">${dup.reason}</p>
+                        </div>
+                    `).join('')}
+                </div>
+                <p class="text-orange-700 text-xs mt-2">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Click "Save Anyway" if you're sure this is not a duplicate.
+                </p>
+            </div>
+        `;
+    }
+    
+    resultsDiv.removeClass('hidden').html(html);
+    
+    // Show "Save Anyway" button if there are duplicates or only warnings (no errors)
+    if (result.duplicates.length > 0 || (result.is_valid && result.warnings.length > 0)) {
+        $('#force-save-btn').removeClass('hidden');
+    } else {
+        $('#force-save-btn').addClass('hidden');
+    }
+}
+
+function savePO() {
     const id = $('#po-id').val();
     const data = {
-        po_number: $('#po-number').val(),
+        po_ref: $('#po-number').val(),
         material_id: parseInt($('#material-id').val()) || null,
         supplier_name: $('#supplier-name').val(),
         supplier_contact: $('#supplier-contact').val(),
         supplier_email: $('#supplier-email').val(),
-        po_amount: parseFloat($('#po-amount').val()),
+        total_amount: parseFloat($('#po-amount').val()),
         currency: $('#currency').val(),
-        issue_date: $('#issue-date').val(),
-        expected_delivery_date: $('#expected-delivery-date').val() || null,
+        po_date: $('#issue-date').val(),
         po_status: $('#po-status').val(),
         notes: $('#notes').val(),
         updated_by: 'Manual'
@@ -339,6 +492,18 @@ $('#po-form').on('submit', function(e) {
             window.dashboardUtils.showToast('Error saving purchase order', 'error');
         }
     });
+}
+
+function forceSave() {
+    if (confirm('Are you sure you want to save despite the warnings/duplicates?')) {
+        savePO();
+    }
+}
+
+// Keep the old form submit handler for compatibility
+$('#po-form').on('submit', function(e) {
+    e.preventDefault();
+    validateAndSave();
 });
 
 // Load materials for dropdown
@@ -365,7 +530,7 @@ $('#filter-status, #search-box').on('change keyup', function() {
     
     if (searchText) {
         filtered = filtered.filter(po => 
-            po.po_number.toLowerCase().includes(searchText) ||
+            po.po_ref.toLowerCase().includes(searchText) ||  // Fixed: was po.po_number
             po.supplier_name.toLowerCase().includes(searchText)
         );
     }

@@ -46,8 +46,8 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Number</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion %</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -87,13 +87,19 @@
             
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Quantity Delivered</label>
-                    <input type="number" id="quantity-delivered" step="0.01" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    <label class="block text-gray-700 font-semibold mb-2">Delivery Status *</label>
+                    <select id="delivery-status" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        <option value="Pending">Pending</option>
+                        <option value="Partial">Partial</option>
+                        <option value="Delivered">Delivered (Full)</option>
+                        <option value="Rejected">Rejected/Returned</option>
+                    </select>
                 </div>
                 
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Unit</label>
-                    <input type="text" id="unit" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                <div id="percentage-container">
+                    <label class="block text-gray-700 font-semibold mb-2">Delivery Percentage</label>
+                    <input type="number" id="delivery-percentage" step="1" min="0" max="100" value="0" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    <p class="text-xs text-gray-500 mt-1">For partial deliveries (e.g., 65%)</p>
                 </div>
             </div>
             
@@ -107,18 +113,6 @@
                     <label class="block text-gray-700 font-semibold mb-2">Actual Delivery Date</label>
                     <input type="date" id="actual-delivery-date" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                 </div>
-            </div>
-            
-            <div>
-                <label class="block text-gray-700 font-semibold mb-2">Delivery Status *</label>
-                <select id="delivery-status" required class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="In Transit">In Transit</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Delayed">Delayed</option>
-                    <option value="Partially Delivered">Partially Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
-                </select>
             </div>
             
             <div class="grid grid-cols-2 gap-4">
@@ -138,12 +132,47 @@
                 <textarea id="notes" rows="3" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
             </div>
             
+            <!-- Sprint 2: Document Upload & Intelligence -->
+            <div class="border-t pt-4">
+                <label class="block text-gray-700 font-semibold mb-2">
+                    <i class="fas fa-file-pdf mr-2 text-red-600"></i>Upload Delivery Order (PDF)
+                </label>
+                <input type="file" id="delivery-document" accept=".pdf" 
+                       class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
+                <p class="text-xs text-gray-500 mt-1">
+                    <i class="fas fa-magic mr-1"></i>AI will automatically extract items and quantities from your delivery order
+                </p>
+                
+                <!-- Extraction Status Display -->
+                <div id="extraction-status-container" class="hidden mt-3 p-3 rounded-lg border">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <i id="extraction-icon" class="fas fa-spinner fa-spin text-blue-500"></i>
+                            <span id="extraction-message" class="text-sm font-medium">Processing document...</span>
+                        </div>
+                        <span id="extraction-confidence" class="hidden text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full"></span>
+                    </div>
+                    
+                    <!-- Extracted Items Display -->
+                    <div id="extracted-items" class="hidden mt-3">
+                        <div class="text-xs font-semibold text-gray-600 mb-2">Extracted Items:</div>
+                        <div id="extracted-items-list" class="text-sm bg-gray-50 p-2 rounded max-h-32 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Validation Results Section (Sprint 1) -->
+            <div id="validation-results" class="hidden"></div>
+            
             <div class="flex justify-end space-x-3 pt-4">
                 <button type="button" onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition">
                     Cancel
                 </button>
-                <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg transition">
-                    <i class="fas fa-save mr-2"></i>Save Delivery
+                <button type="button" onclick="validateAndSave()" class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-check-circle mr-2"></i>Validate & Save
+                </button>
+                <button type="button" id="force-save-btn" onclick="forceSave()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg transition">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Save Anyway
                 </button>
             </div>
         </form>
@@ -192,16 +221,26 @@ function displayDeliveries(deliveries) {
         const statusClass = getStatusClass(delivery.delivery_status);
         const isDelayed = delivery.is_delayed ? '<i class="fas fa-exclamation-triangle text-red-600 ml-2" title="Delayed"></i>' : '';
         
+        const deliveryPercentage = delivery.delivery_percentage || 0;
+        const percentageDisplay = delivery.delivery_status === 'Partial' ? `${deliveryPercentage}%` : (delivery.delivery_status === 'Delivered' ? '100%' : '-');
+        
         const row = `
             <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 font-semibold text-gray-800">${delivery.purchase_order ? delivery.purchase_order.po_number : '-'}</td>
+                <td class="px-6 py-4 font-semibold text-gray-800">${delivery.purchase_order ? delivery.purchase_order.po_ref : '-'}</td>
                 <td class="px-6 py-4 text-gray-600">${delivery.purchase_order && delivery.purchase_order.material ? delivery.purchase_order.material.material_type : '-'}</td>
-                <td class="px-6 py-4 text-gray-600">${delivery.quantity_delivered || '-'} ${delivery.unit || ''}</td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">
                         ${delivery.delivery_status}
                     </span>
                     ${isDelayed}
+                </td>
+                <td class="px-6 py-4 text-gray-600">
+                    <div class="flex items-center">
+                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: ${deliveryPercentage}%"></div>
+                        </div>
+                        <span class="text-sm font-semibold">${percentageDisplay}</span>
+                    </div>
                 </td>
                 <td class="px-6 py-4 text-gray-600 text-sm">${window.dashboardUtils.formatDate(delivery.expected_delivery_date)}</td>
                 <td class="px-6 py-4 text-gray-600 text-sm">${delivery.actual_delivery_date ? window.dashboardUtils.formatDate(delivery.actual_delivery_date) : '-'}</td>
@@ -221,12 +260,10 @@ function displayDeliveries(deliveries) {
 
 function getStatusClass(status) {
     const classes = {
-        'Scheduled': 'bg-blue-100 text-blue-800',
-        'In Transit': 'bg-purple-100 text-purple-800',
+        'Pending': 'bg-blue-100 text-blue-800',
+        'Partial': 'bg-yellow-100 text-yellow-800',
         'Delivered': 'bg-green-100 text-green-800',
-        'Delayed': 'bg-red-100 text-red-800',
-        'Partially Delivered': 'bg-yellow-100 text-yellow-800',
-        'Cancelled': 'bg-gray-100 text-gray-800'
+        'Rejected': 'bg-red-100 text-red-800'
     };
     return classes[status] || 'bg-gray-100 text-gray-800';
 }
@@ -244,9 +281,9 @@ function editDelivery(id) {
     
     $('#modal-title').text('Edit Delivery');
     $('#delivery-id').val(delivery.id);
-    $('#purchase-order-id').val(delivery.purchase_order_id);
-    $('#quantity-delivered').val(delivery.quantity_delivered || '');
-    $('#unit').val(delivery.unit || '');
+    $('#purchase-order-id').val(delivery.po_id);
+    $('#delivery-status').val(delivery.delivery_status || 'Pending');
+    $('#delivery-percentage').val(delivery.delivery_percentage || 0);
     $('#expected-delivery-date').val(delivery.expected_delivery_date ? delivery.expected_delivery_date.split('T')[0] : '');
     $('#actual-delivery-date').val(delivery.actual_delivery_date ? delivery.actual_delivery_date.split('T')[0] : '');
     $('#delivery-status').val(delivery.delivery_status);
@@ -259,6 +296,8 @@ function editDelivery(id) {
 
 function closeModal() {
     $('#delivery-modal').addClass('hidden');
+    $('#validation-results').addClass('hidden').empty();
+    $('#force-save-btn').addClass('hidden');
 }
 
 function deleteDelivery(id) {
@@ -281,18 +320,152 @@ function deleteDelivery(id) {
     });
 }
 
-$('#delivery-form').on('submit', function(e) {
-    e.preventDefault();
+// Validate and Save function (Sprint 1 Integration)
+async function validateAndSave() {
+    const id = $('#delivery-id').val();
+    const isEdit = !!id;
     
+    const data = {
+        lpo_id: parseInt($('#purchase-order-id').val()),
+        delivery_date: $('#actual-delivery-date').val() || $('#expected-delivery-date').val(),
+        status: $('#delivery-status').val(),
+        delivery_percentage: parseFloat($('#delivery-percentage').val()) || 0
+    };
+    
+    // Show validating message
+    $('#validation-results').removeClass('hidden').html(`
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+            <div class="flex items-center">
+                <i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>
+                <span class="text-blue-700 text-sm">Validating delivery with AI agent...</span>
+            </div>
+        </div>
+    `);
+    
+    try {
+        const response = await fetch('/api/agents/validate-and-check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': '{{ config.N8N_TO_FLASK_API_KEY or "" }}'
+            },
+            body: JSON.stringify({
+                record_type: 'delivery',
+                data: data,
+                check_duplicates: !isEdit
+            })
+        });
+        
+        const result = await response.json();
+        displayValidationResults(result, isEdit);
+        
+    } catch (error) {
+        $('#validation-results').removeClass('hidden').html(`
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                    <span class="text-red-700 text-sm">Validation error: ${error.message}</span>
+                </div>
+            </div>
+        `);
+    }
+}
+
+function displayValidationResults(result, isEdit) {
+    const resultsDiv = $('#validation-results');
+    let html = '';
+    
+    const perfBadge = `<span class="text-xs text-gray-500 ml-2">⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage} tokens</span>`;
+    
+    if (result.is_valid && result.duplicates.length === 0) {
+        html = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-500 text-lg mr-2"></i>
+                        <span class="text-green-800 font-semibold">✅ Validation Passed!</span>
+                        ${perfBadge}
+                    </div>
+                </div>
+                <p class="text-green-700 text-sm mt-1">Delivery validated successfully. Ready to save.</p>
+            </div>
+        `;
+        resultsDiv.removeClass('hidden').html(html);
+        setTimeout(() => saveDelivery(), 1000);
+        return;
+    }
+    
+    if (result.errors && result.errors.length > 0) {
+        html += `
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                    <span class="text-red-800 font-semibold">❌ Validation Errors</span>
+                    ${perfBadge}
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.errors.map(err => `<li class="text-red-700 text-sm">• ${err}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    if (result.warnings && result.warnings.length > 0) {
+        html += `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                    <span class="text-yellow-800 font-semibold">⚠️ Warnings</span>
+                </div>
+                <ul class="mt-2 space-y-1">
+                    ${result.warnings.map(warn => `<li class="text-yellow-700 text-sm">• ${warn}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    if (result.duplicates && result.duplicates.length > 0) {
+        html += `
+            <div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-copy text-orange-500 mr-2"></i>
+                    <span class="text-orange-800 font-semibold">🔍 Potential Duplicates (${result.duplicates.length})</span>
+                </div>
+                <div class="mt-2 space-y-2">
+                    ${result.duplicates.map(dup => `
+                        <div class="bg-white rounded p-2 text-sm">
+                            <div class="flex justify-between items-start">
+                                <span class="font-semibold text-orange-900">${dup.match_type}</span>
+                                <span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                                    ${Math.round(dup.confidence * 100)}% match
+                                </span>
+                            </div>
+                            <p class="text-orange-700 mt-1">${dup.reason}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    resultsDiv.removeClass('hidden').html(html);
+    
+    if (result.duplicates.length > 0 || (result.is_valid && result.warnings.length > 0)) {
+        $('#force-save-btn').removeClass('hidden');
+    } else {
+        $('#force-save-btn').addClass('hidden');
+    }
+}
+
+function saveDelivery() {
     const id = $('#delivery-id').val();
     const data = {
-        purchase_order_id: parseInt($('#purchase-order-id').val()),
-        quantity_delivered: parseFloat($('#quantity-delivered').val()) || null,
-        unit: $('#unit').val(),
+        po_id: parseInt($('#purchase-order-id').val()),
+        delivery_percentage: parseFloat($('#delivery-percentage').val()) || 0,
         expected_delivery_date: $('#expected-delivery-date').val(),
         actual_delivery_date: $('#actual-delivery-date').val() || null,
         delivery_status: $('#delivery-status').val(),
-        delivery_note_number: $('#delivery-note-number').val(),
+        tracking_number: $('#delivery-note-number').val(),
         received_by: $('#received-by').val(),
         notes: $('#notes').val(),
         updated_by: 'Manual'
@@ -319,6 +492,17 @@ $('#delivery-form').on('submit', function(e) {
             window.dashboardUtils.showToast('Error saving delivery', 'error');
         }
     });
+}
+
+function forceSave() {
+    if (confirm('Are you sure you want to save despite the warnings/duplicates?')) {
+        saveDelivery();
+    }
+}
+
+$('#delivery-form').on('submit', function(e) {
+    e.preventDefault();
+    validateAndSave();
 });
 
 // Load purchase orders for dropdown

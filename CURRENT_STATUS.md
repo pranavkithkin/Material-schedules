@@ -26,6 +26,7 @@ Week 1.5: File Upload & Deployment
 Week 2-3: AI Document Processing ⭐ YOU ARE HERE
 ├── API Authentication         ✅ DONE (Phase 2.1)
 ├── n8n Webhook Endpoints      ✅ DONE (7 endpoints)
+├── AI Agents Roadmap          ✅ DONE (14 agents documented)
 ├── AI Document Extraction     ⏳ NEXT → Phase 2.2 (services/ai_agent.py)
 ├── Enhanced Chat Interface    ⏳ TODO → Phase 2.3
 └── Conversation Tracking      ⏳ TODO → models/conversation.py
@@ -51,13 +52,14 @@ Week 4-5: Advanced Features
 Phase 1: Core Dashboard          ████████████████████  100% ✅
 Phase 1.4: File Upload           ████████████████████  100% ✅
 Phase 2.1: API Security          ████████████████████  100% ✅
+AI Agents Roadmap                ████████████████████  100% ✅ (Planning Complete)
 Phase 2.2: AI Document Extract   ░░░░░░░░░░░░░░░░░░░░    0% ⏳ NEXT
 Phase 2.3: Enhanced Chat         ███░░░░░░░░░░░░░░░░░   15% (basic exists)
 Phase 3: n8n Workflows           ░░░░░░░░░░░░░░░░░░░░    0% ⏳
 Phase 4: Advanced Features       ░░░░░░░░░░░░░░░░░░░░    0% ⏳
 Phase 5: Email Monitor           ░░░░░░░░░░░░░░░░░░░░    0% ⏳ OPTIONAL (Last)
 
-OVERALL PROJECT: ████████████░░░░░░░░ 50%
+OVERALL PROJECT: ████████████░░░░░░░░ 52% (Planning Phase Complete)
 ```
 
 ---
@@ -118,7 +120,39 @@ OVERALL PROJECT: ████████████░░░░░░░░ 50
 
 ## 🚀 WHAT WE'RE BUILDING NEXT
 
-### **Phase 1B: AI Agent System**
+### **🎉 NEW: AI Agents Roadmap Complete!**
+
+**Status:** 🚀 APPROVED - Sprint 1 Implementation Started!
+**Document:** [AI_AGENTS_ROADMAP.md](AI_AGENTS_ROADMAP.md)
+
+**Current Sprint:** Sprint 1 (Foundation) - Building data validation layer
+
+**What's Documented:**
+- **14 AI Agents** across 6 categories
+- **Priority Matrix** (Critical → Low)
+- **7 Sprint Implementation Plan** (6-7 weeks)
+- **Dependency Graph** (which agents need others first)
+- **Technical Architecture** (databases, APIs, integrations)
+- **Testing Strategy** (unit, integration, E2E tests)
+- **Success Metrics** (efficiency, business, adoption)
+
+**Unified Agents:**
+1. **Data Processing Agent** (CRITICAL) - Validation + Duplicates + Matching | 🟢 ZERO tokens!
+2. **Document Intelligence Agent** (CRITICAL) - Storage + Classification + Extraction | High tokens
+3. **Conversational Agent** (CRITICAL) - NLP + Chat + Reports + Queries | Medium tokens
+4. **Automation Agent** (HIGH) - All Reminders + Notifications | Low tokens
+5. **Analytics Agent** (MEDIUM) - Patterns + Predictions + Insights | Medium tokens
+6. **Email Processing Agent** (LOW/Optional) - Email Monitor + Routing | Very high tokens
+
+**Progress:**
+- ✅ Agent 1 (Data Processing): **50% Complete** - Unified validation + duplicates
+- ⏳ Agent 2 (Document Intelligence): Next (Week 2)
+- ⏳ Agent 3 (Conversational): Week 3
+- ⏳ Agent 4 (Automation): Week 4
+
+---
+
+### **Phase 2.2: AI Document Extraction (NEXT)**
 
 **Goal:** Transform manual data entry into intelligent automation
 

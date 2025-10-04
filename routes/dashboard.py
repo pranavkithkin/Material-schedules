@@ -16,27 +16,42 @@ def index():
 @dashboard_bp.route('/materials')
 def materials_page():
     """Materials management page"""
-    return render_template('materials.html')
+    import os
+    api_key = os.getenv('N8N_TO_FLASK_API_KEY', '')
+    return render_template('materials.html', config={'N8N_TO_FLASK_API_KEY': api_key})
 
 @dashboard_bp.route('/purchase_orders')
 def purchase_orders_page():
     """Purchase orders management page"""
-    return render_template('purchase_orders.html')
+    import os
+    api_key = os.getenv('N8N_TO_FLASK_API_KEY', '')
+    return render_template('purchase_orders.html', config={'N8N_TO_FLASK_API_KEY': api_key})
 
 @dashboard_bp.route('/payments')
 def payments_page():
     """Payments management page"""
-    return render_template('payments.html')
+    import os
+    api_key = os.getenv('N8N_TO_FLASK_API_KEY', '')
+    return render_template('payments.html', config={'N8N_TO_FLASK_API_KEY': api_key})
 
 @dashboard_bp.route('/deliveries')
 def deliveries_page():
     """Deliveries management page"""
-    return render_template('deliveries.html')
+    import os
+    api_key = os.getenv('N8N_TO_FLASK_API_KEY', '')
+    return render_template('deliveries.html', config={'N8N_TO_FLASK_API_KEY': api_key})
 
 @dashboard_bp.route('/ai_suggestions')
 def ai_suggestions_page():
     """AI suggestions review page"""
     return render_template('ai_suggestions.html')
+
+@dashboard_bp.route('/test-validation')
+def test_validation_page():
+    """Test validation agent page (Sprint 1)"""
+    import os
+    api_key = os.getenv('N8N_TO_FLASK_API_KEY', '')
+    return render_template('test_validation.html', api_key=api_key)
 
 @dashboard_bp.route('/api/dashboard/stats')
 def dashboard_stats():

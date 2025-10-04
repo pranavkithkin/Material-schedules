@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}Test Validation Agent - Sprint 1{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-pkp-green to-green-600 text-white rounded-lg shadow-lg p-6">
+        <h2 class="text-3xl font-bold">
+            <i class="fas fa-check-circle mr-2"></i>
+            Test Data Processing Agent
+        </h2>
+        <p class="mt-2 text-green-100">Sprint 1 - Real-time validation with zero tokens!</p>
+    </div>
+
+    <!-- Test Type Selector -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <label class="block text-gray-700 font-semibold mb-3">Select Test Type:</label>
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="selectTest('lpo')" id="btn-lpo" 
+                    class="test-btn bg-blue-100 hover:bg-blue-200 text-blue-800 p-4 rounded-lg border-2 border-transparent transition">
+                <i class="fas fa-file-invoice text-2xl mb-2"></i>
+                <div class="font-semibold">Purchase Order</div>
+            </button>
+            <button onclick="selectTest('invoice')" id="btn-invoice"
+                    class="test-btn bg-purple-100 hover:bg-purple-200 text-purple-800 p-4 rounded-lg border-2 border-transparent transition">
+                <i class="fas fa-receipt text-2xl mb-2"></i>
+                <div class="font-semibold">Invoice/Payment</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- LPO Test Form -->
+    <div id="lpo-form" class="hidden bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-file-invoice text-blue-600 mr-2"></i>
+            Test Purchase Order Validation
+        </h3>
+        
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Material ID</label>
+                    <input type="number" id="lpo-material-id" value="1" 
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">LPO Number</label>
+                    <input type="text" id="lpo-number" value="LPO-2025-123" 
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Supplier Name</label>
+                <input type="text" id="lpo-supplier" value="ABC Suppliers Ltd" 
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Release Date</label>
+                    <input type="date" id="lpo-date" value="2025-10-10" 
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Amount (AED)</label>
+                    <input type="number" id="lpo-amount" value="50000" step="0.01"
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div class="flex items-center">
+                <input type="checkbox" id="lpo-check-duplicates" checked class="mr-2">
+                <label class="text-gray-700">Check for duplicates</label>
+            </div>
+
+            <button onclick="testLPOValidation()" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition">
+                <i class="fas fa-check-circle mr-2"></i>Validate LPO
+            </button>
+        </div>
+    </div>
+
+    <!-- Invoice Test Form -->
+    <div id="invoice-form" class="hidden bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-receipt text-purple-600 mr-2"></i>
+            Test Invoice/Payment Validation
+        </h3>
+        
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Invoice Reference</label>
+                    <input type="text" id="inv-ref" value="INV-2025-555" 
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Reference</label>
+                    <input type="text" id="pay-ref" value="PAY-2025-555" 
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Payment Date</label>
+                    <input type="date" id="pay-date" value="2025-10-04" 
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Total Amount (AED)</label>
+                    <input type="number" id="pay-amount" value="25000" step="0.01"
+                           class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">PO ID (optional)</label>
+                <input type="number" id="pay-po-id" value="1" 
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500">
+            </div>
+
+            <div class="flex items-center">
+                <input type="checkbox" id="inv-check-duplicates" checked class="mr-2">
+                <label class="text-gray-700">Check for duplicates</label>
+            </div>
+
+            <button onclick="testInvoiceValidation()" 
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition">
+                <i class="fas fa-check-circle mr-2"></i>Validate Invoice
+            </button>
+        </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div id="results" class="hidden bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-gray-800">
+                <i class="fas fa-flask mr-2"></i>Validation Results
+            </h3>
+            <span id="processing-time" class="text-sm text-gray-600"></span>
+        </div>
+
+        <div id="results-content"></div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+        <div class="flex">
+            <i class="fas fa-info-circle text-blue-500 mt-1 mr-3"></i>
+            <div>
+                <h4 class="font-semibold text-blue-800">Sprint 1 - Data Processing Agent</h4>
+                <p class="text-blue-700 text-sm mt-1">
+                    This agent validates data in real-time with <strong>ZERO tokens</strong> (no AI cost!). 
+                    It checks for required fields, format errors, and duplicates in your database.
+                </p>
+                <div class="mt-2 text-xs text-blue-600">
+                    ⚡ Target: <100ms | 💰 Cost: $0 | 🔍 Duplicates: Yes | 🤖 AI: No
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Test type selection
+function selectTest(type) {
+    // Hide all forms
+    document.getElementById('lpo-form').classList.add('hidden');
+    document.getElementById('invoice-form').classList.add('hidden');
+    document.getElementById('results').classList.add('hidden');
+    
+    // Reset button styles
+    document.querySelectorAll('.test-btn').forEach(btn => {
+        btn.classList.remove('border-green-500', 'bg-green-50');
+    });
+    
+    // Show selected form
+    if (type === 'lpo') {
+        document.getElementById('lpo-form').classList.remove('hidden');
+        document.getElementById('btn-lpo').classList.add('border-green-500', 'bg-green-50');
+    } else {
+        document.getElementById('invoice-form').classList.remove('hidden');
+        document.getElementById('btn-invoice').classList.add('border-green-500', 'bg-green-50');
+    }
+}
+
+// Test LPO Validation
+async function testLPOValidation() {
+    const data = {
+        record_type: 'lpo_release',
+        data: {
+            material_id: parseInt(document.getElementById('lpo-material-id').value),
+            lpo_number: document.getElementById('lpo-number').value,
+            supplier_name: document.getElementById('lpo-supplier').value,
+            release_date: document.getElementById('lpo-date').value,
+            amount: parseFloat(document.getElementById('lpo-amount').value)
+        },
+        check_duplicates: document.getElementById('lpo-check-duplicates').checked
+    };
+
+    await callValidationAPI(data);
+}
+
+// Test Invoice Validation
+async function testInvoiceValidation() {
+    const data = {
+        record_type: 'invoice',
+        data: {
+            invoice_ref: document.getElementById('inv-ref').value,
+            payment_ref: document.getElementById('pay-ref').value,
+            payment_date: document.getElementById('pay-date').value,
+            total_amount: parseFloat(document.getElementById('pay-amount').value),
+            po_id: parseInt(document.getElementById('pay-po-id').value)
+        },
+        check_duplicates: document.getElementById('inv-check-duplicates').checked
+    };
+
+    await callValidationAPI(data);
+}
+
+// Call Validation API
+async function callValidationAPI(data) {
+    const resultsDiv = document.getElementById('results');
+    const resultsContent = document.getElementById('results-content');
+    
+    // Show loading
+    resultsDiv.classList.remove('hidden');
+    resultsContent.innerHTML = `
+        <div class="text-center py-8">
+            <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
+            <p class="text-gray-600 mt-2">Validating...</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/agents/validate-and-check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': '{{ api_key }}'  // Will be injected by Flask
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        displayResults(result);
+    } catch (error) {
+        resultsContent.innerHTML = `
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                <div class="flex">
+                    <i class="fas fa-exclamation-circle text-red-500 mt-1 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-red-800">Error</h4>
+                        <p class="text-red-700 text-sm mt-1">${error.message}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Display Results
+function displayResults(result) {
+    const resultsContent = document.getElementById('results-content');
+    const processingTime = document.getElementById('processing-time');
+    
+    processingTime.textContent = `⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage} tokens`;
+
+    let html = '';
+
+    // Success/Error Badge
+    if (result.is_valid && result.duplicates.length === 0) {
+        html += `
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle text-green-500 text-2xl mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-green-800">✅ Valid & Ready to Save!</h4>
+                        <p class="text-green-700 text-sm">All checks passed. No errors or duplicates found.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (!result.is_valid) {
+        html += `
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-times-circle text-red-500 text-2xl mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-red-800">❌ Validation Failed</h4>
+                        <p class="text-red-700 text-sm">Please fix the errors below.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (result.duplicates.length > 0) {
+        html += `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-yellow-800">⚠️ Duplicates Found</h4>
+                        <p class="text-yellow-700 text-sm">Similar records exist in the database.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Errors
+    if (result.errors && result.errors.length > 0) {
+        html += `
+            <div class="bg-white border border-red-200 rounded-lg p-4 mb-4">
+                <h5 class="font-semibold text-red-800 mb-2">
+                    <i class="fas fa-bug mr-2"></i>Errors (${result.errors.length})
+                </h5>
+                <ul class="space-y-1">
+                    ${result.errors.map(err => `<li class="text-red-700 text-sm">• ${err}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // Warnings
+    if (result.warnings && result.warnings.length > 0) {
+        html += `
+            <div class="bg-white border border-yellow-200 rounded-lg p-4 mb-4">
+                <h5 class="font-semibold text-yellow-800 mb-2">
+                    <i class="fas fa-exclamation-circle mr-2"></i>Warnings (${result.warnings.length})
+                </h5>
+                <ul class="space-y-1">
+                    ${result.warnings.map(warn => `<li class="text-yellow-700 text-sm">• ${warn}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // Duplicates
+    if (result.duplicates && result.duplicates.length > 0) {
+        html += `
+            <div class="bg-white border border-orange-200 rounded-lg p-4 mb-4">
+                <h5 class="font-semibold text-orange-800 mb-3">
+                    <i class="fas fa-copy mr-2"></i>Potential Duplicates (${result.duplicates.length})
+                </h5>
+                <div class="space-y-3">
+                    ${result.duplicates.map(dup => `
+                        <div class="bg-orange-50 rounded p-3 text-sm">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-semibold text-orange-900">${dup.match_type}</span>
+                                    <span class="ml-2 text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                                        ${Math.round(dup.confidence * 100)}% match
+                                    </span>
+                                </div>
+                            </div>
+                            <p class="text-orange-700 mt-2">${dup.reason}</p>
+                            ${dup.amount ? `<p class="text-orange-600 text-xs mt-1">Amount: AED ${dup.amount.toLocaleString()}</p>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Raw JSON (for debugging)
+    html += `
+        <details class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <summary class="font-semibold text-gray-700 cursor-pointer">
+                <i class="fas fa-code mr-2"></i>View Raw JSON Response
+            </summary>
+            <pre class="mt-3 text-xs text-gray-600 overflow-auto">${JSON.stringify(result, null, 2)}</pre>
+        </details>
+    `;
+
+    resultsContent.innerHTML = html;
+}
+
+// Auto-select first test on load
+window.addEventListener('load', () => {
+    selectTest('lpo');
+});
+</script>
+{% endblock %}
