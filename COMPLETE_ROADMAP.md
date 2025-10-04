@@ -197,102 +197,85 @@ Include comprehensive error handling and validation."
 
 ---
 
-### PHASE 2: API Layer for n8n (Week 2)
-**Goal:** RESTful API that n8n can interact with
+### PHASE 2: API Security & AI Agent (Week 2-3)
+**Goal:** Smart document processing and conversational data entry
 
-#### Step 2.1: API Authentication
+#### Step 2.1: API Authentication ✅ COMPLETE
+- API key authentication system (routes/auth.py)
+- 7 n8n webhook endpoints created
+- Test suite implemented
+- Documentation complete
+
+#### Step 2.2: AI Document Extraction Service (NEXT)
 **What to ask Claude:**
 ```
-"Create API key authentication for n8n:
-- Generate API keys
-- Middleware to verify API key in requests
-- Separate API routes under /api/
-- Return JSON responses
-- Error handling with proper HTTP codes"
+"Create AI agent service (services/ai_agent.py) that:
+1. Accepts uploaded PDF files
+2. Extracts text from PDF (PyPDF2)
+3. Uses Claude API to analyze and extract:
+   - Purchase Order details (PO number, supplier, amount, date)
+   - Invoice details (invoice number, amount, payment terms)
+   - Delivery notes (delivery date, items, status)
+4. Returns structured JSON with confidence scores per field
+5. Identifies missing/unclear fields
+6. Generates clarifying questions for user
+
+Features:
+- Handle scanned PDFs (OCR with pytesseract - optional)
+- Multiple document types (PO, Invoice, Delivery Note)
+- Field-level confidence scoring
+- AI reasoning for transparency
+- Error handling for corrupted/unreadable files
+
+Integration:
+- Add 'Process with AI' button on uploads page
+- Show extracted fields with confidence indicators
+- Allow user to edit before approving
+- Save to AISuggestions table for review"
 ```
 
-#### Step 2.2: API Endpoints
+#### Step 2.3: Enhanced Chat Interface
 **What to ask Claude:**
 ```
-"Create these API endpoints:
+"Enhance chat service (services/chat_service.py) for natural language data entry:
 
-READ ENDPOINTS:
-GET /api/materials - List all materials with filters
-GET /api/material/<id> - Get single material details
-GET /api/pending-deliveries - Materials with delivery in next [X] days
+1. Multi-turn Conversation Tracking:
+   - Create models/conversation.py to store chat history
+   - Track conversation context across multiple messages
+   - Remember user preferences and partial data
 
-WRITE ENDPOINTS (for n8n):
-POST /api/suggestion - Submit AI-extracted data
-  Body: {
-    material_id: int,
-    source: "email/pdf/portal",
-    suggestion_type: "po/payment/delivery/status",
-    extracted_data: {field: value, ...},
-    confidence_score: 0-100,
-    ai_reasoning: "explanation"
-  }
+2. Natural Language Data Entry:
+   User: 'Add a PO for steel from ABC, 50 tons, 80k'
+   AI: 'Got it! What's the PO number?'
+   User: 'PO-5678'
+   AI: 'When do you expect delivery?'
+   User: 'Next Monday'
+   AI: '✅ Created PO-5678 for Steel. Missing supplier email - add it or skip?'
 
-POST /api/notification - Log notifications sent
-GET /api/export - Export data as CSV/JSON
+3. Smart Features:
+   - Entity extraction (dates, amounts, material names)
+   - Smart defaults (today's date, AED currency)
+   - Confirmation before creating records
+   - Show summary with edit option
+   - Handle corrections: 'Actually, make it 60 tons'
 
-Include request validation and detailed error messages."
+4. Query Capabilities:
+   - 'When is cement delivery?'
+   - 'Show pending POs'
+   - 'What's the total payment for supplier ABC?'
+   - 'List delayed deliveries'
+
+Include conversation persistence, context awareness, and error handling."
 ```
 
-#### Step 2.3: AI Suggestions Review Interface
-**What to ask Claude:**
-```
-"Create UI for reviewing AI suggestions:
-- Pending suggestions panel on dashboard
-- Show: What AI extracted, confidence score, reasoning
-- Side-by-side comparison: Current data vs AI suggestion
-- Approve/Reject buttons
-- When approved: Update main tables and mark suggestion as approved
-- When rejected: Mark suggestion as rejected with optional reason
-- Filter by confidence level, date, type"
-```
-
-**✅ Deliverable:** Dashboard with API that n8n can call
+**✅ Deliverable:** Smart AI agent that processes documents and enables conversational data entry
 
 ---
 
-### PHASE 3: n8n Workflows (Week 3)
-**Goal:** Automated data extraction workflows
+### PHASE 3: n8n Automation Workflows (Week 3-4)
+**Goal:** Automated workflows for reminders and notifications
 
-#### Step 3.1: Email Monitoring Workflow
-**What to ask Claude:**
-```
-"Create n8n workflow JSON for:
-1. IMAP Email Trigger - Monitor inbox for supplier emails
-2. Filter emails - Keywords: PO, delivery, invoice
-3. Extract attachments (PDF)
-4. HTTP Request to Claude API:
-   Prompt: 'Extract from this email: PO number, material name, delivery date, 
-            supplier name, amount. Return JSON with confidence score.'
-5. Parse Claude response
-6. HTTP Request to dashboard API POST /api/suggestion
-7. If confidence > 90%: Send success notification
-8. If confidence 60-89%: Send review-needed notification
-
-Provide the complete workflow JSON and setup instructions."
-```
-
-#### Step 3.2: PDF Processing Workflow
-**What to ask Claude:**
-```
-"Create n8n workflow for manual PDF upload:
-1. Webhook Trigger - Dashboard sends PDF when user uploads
-2. Extract text from PDF (use n8n PDF node or external service)
-3. HTTP Request to OpenAI API:
-   Prompt: 'This is a [submittal approval/invoice]. Extract: [fields]. 
-            Rate your confidence 0-100%.'
-4. Parse response
-5. POST extracted data to /api/suggestion
-6. Return success/error to dashboard
-
-Include error handling for unreadable PDFs."
-```
-
-#### Step 3.3: Delivery Reminder Workflow
+#### Step 3.1: Delivery Reminder Workflow
 **What to ask Claude:**
 ```
 "Create scheduled n8n workflow:
@@ -329,43 +312,12 @@ Provide workflow JSON and notification templates."
 Provide workflow JSON and report template."
 ```
 
-**✅ Deliverable:** 4 working n8n workflows
+**✅ Deliverable:** Automated delivery reminders and weekly reports
 
 ---
 
-### PHASE 4: Natural Language Chat Interface (Week 4)
-**Goal:** Ask questions in plain English
-
-#### Step 4.1: Chat Interface UI
-**What to ask Claude:**
-```
-"Add a chat interface to the dashboard:
-- Chat icon/button in bottom-right corner
-- Chat window slides up when clicked
-- Message history display
-- Text input with send button
-- Loading indicator while AI processes
-- Show sources/data referenced in responses
-- Chat history persists in session"
-```
-
-#### Step 4.2: Chat Backend
-**What to ask Claude:**
-```
-"Create Flask route POST /api/chat:
-1. Receive user question
-2. Determine intent (using Claude API):
-   - Data query: "Which materials are delayed?"
-   - Status check: "When is DB arriving?"
-   - Summary request: "Show payment status"
-3. Query database based on intent
-4. Format results
-5. Send to Claude API with prompt:
-   'Answer this question based on the data provided. Be concise and clear.'
-6. Return AI response to frontend
-
-Include sample queries and expected responses."
-```
+### PHASE 4: Advanced Features (Week 4-5)
+**Goal:** Analytics, predictions, and advanced automation
 
 #### Step 4.3: Enhanced Query Handling
 **What to ask Claude:**
@@ -607,16 +559,61 @@ Portal Data → AI Extraction (confidence: 45%) → Log as Low Confidence
 
 ---
 
+---
+
+### PHASE 5: Email Monitor Workflow (OPTIONAL - Final Phase)
+**Goal:** Automated email parsing for unstructured supplier communications
+
+**Note:** This is moved to the end because emails are often unstructured and parsing them requires significant effort for limited value. Prioritize manual upload + AI extraction first.
+
+#### Step 5.1: Email Monitoring Setup
+**What to ask Claude:**
+```
+"Create n8n workflow for email monitoring:
+1. IMAP Email Trigger - Monitor inbox every 30 minutes
+2. Filter emails - Keywords: PO, Purchase Order, Delivery, Invoice
+3. Extract email body + attachments (PDF)
+4. HTTP Request to Claude API:
+   Prompt: 'Extract from this email: PO number, material name, delivery date, 
+            supplier name, amount. Return JSON with confidence score.
+            If unclear, set low confidence.'
+5. Parse Claude response
+6. POST to /api/n8n/ai-suggestion
+7. Notification based on confidence:
+   - High (≥90%): Success notification
+   - Medium (60-89%): Review needed
+   - Low (<60%): Ignore or flag
+
+Include:
+- Error handling for email parsing failures
+- Attachment handling (PDF/images only)
+- Spam/irrelevant email filtering
+- Rate limiting for API calls
+- Complete workflow JSON export"
+```
+
+**Why This is Last:**
+- Emails are often unstructured (casual language, incomplete info)
+- Low accuracy compared to manual PDF upload
+- Requires extensive prompt engineering
+- Better to focus on structured data entry first
+- Can always add later if email quality improves
+
+**✅ Deliverable:** Email monitoring (only if needed after core features work well)
+
+---
+
 ## 📅 Timeline Summary (Updated)
 
 | Week | Phase | Focus | Deliverable |
 |------|-------|-------|-------------|
 | 1 | Phase 1 | Core Dashboard | ✅ Manual data entry system |
-| 1.5-2 | **Phase 1B** | **AI Agent System** | **🔄 Intelligent extraction + conversation** |
-| 2 | Phase 2 | API Layer | API authentication + security |
-| 3 | Phase 3 | n8n Workflows | Automated email/PDF processing |
-| 4 | Phase 4 | Enhanced Chat | Advanced NL queries + analytics |
-| 5 | Phase 5 | Advanced Features | Predictive alerts + reconciliation |
+| 2 | **Phase 2.1** | **API Security** | **✅ n8n authentication + webhooks** |
+| 2-3 | **Phase 2.2** | **AI Document Extraction** | **⏳ Smart PDF processing** ← **NEXT**
+| 3 | **Phase 2.3** | **Enhanced Chat** | **⏳ Conversational data entry** |
+| 3-4 | Phase 3 | n8n Workflows | ⏳ Delivery reminders + reports |
+| 4-5 | Phase 4 | Advanced Features | ⏳ Analytics + predictions |
+| 5+ | Phase 5 | Email Monitor | ⏳ Optional email parsing (if needed) |
 
 **Updated Focus:**
 - Week 1: ✅ Core dashboard complete with PKP branding

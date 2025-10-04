@@ -23,20 +23,18 @@ Week 1.5: File Upload & Deployment
 ├── Render Deployment          ✅ DONE (Live on Render)
 └── Production Testing         ✅ DONE
 
-Week 2: n8n Integration ⭐ YOU ARE HERE
-├── API Authentication         ✅ DONE (Phase 2.1) ← JUST COMPLETED!
+Week 2-3: AI Document Processing ⭐ YOU ARE HERE
+├── API Authentication         ✅ DONE (Phase 2.1)
 ├── n8n Webhook Endpoints      ✅ DONE (7 endpoints)
-├── Email Monitor Workflow     ⏳ NEXT → Phase 2.2
-├── PDF Processing             ⏳ TODO → Phase 2.3
-├── Delivery Reminders         ⏳ TODO
-└── Weekly Reports             ⏳ TODO
+├── AI Document Extraction     ⏳ NEXT → Phase 2.2 (services/ai_agent.py)
+├── Enhanced Chat Interface    ⏳ TODO → Phase 2.3
+└── Conversation Tracking      ⏳ TODO → models/conversation.py
 
-Week 3-4: AI Agent System
-├── AI Agent Service           ⏳ PENDING → Implement services/ai_agent.py
-├── Conversation Tracking      ⏳ PENDING → Create models/conversation.py
-├── Document Extraction        ⏳ PENDING → PDF/Email processing
-├── Enhanced Chat              ⏳ PENDING → Add multi-turn conversations
-└── Clarification System       ⏳ PENDING → Ask for missing data
+Week 3-4: n8n Automation
+├── Delivery Reminder Workflow ⏳ PENDING → Phase 3.1
+├── Weekly Report Generator    ⏳ PENDING → Phase 3.2
+├── WhatsApp Notifications     ⏳ PENDING → Phase 3.3
+└── Email Monitor (Optional)   ⏳ LAST → Phase 5 (if needed)
 
 Week 4-5: Advanced Features
 ├── Predictive Alerts          ⏳ PENDING
@@ -52,14 +50,14 @@ Week 4-5: Advanced Features
 ```
 Phase 1: Core Dashboard          ████████████████████  100% ✅
 Phase 1.4: File Upload           ████████████████████  100% ✅
-Phase 2.1: API Security          ████████████████████  100% ✅ (NEW!)
-Phase 2.2: n8n Email Monitor     ░░░░░░░░░░░░░░░░░░░░    0% ⏳
-Phase 2.3: AI Agent System       ░░░░░░░░░░░░░░░░░░░░    0% ⏳
+Phase 2.1: API Security          ████████████████████  100% ✅
+Phase 2.2: AI Document Extract   ░░░░░░░░░░░░░░░░░░░░    0% ⏳ NEXT
+Phase 2.3: Enhanced Chat         ███░░░░░░░░░░░░░░░░░   15% (basic exists)
 Phase 3: n8n Workflows           ░░░░░░░░░░░░░░░░░░░░    0% ⏳
-Phase 4: Enhanced Chat           ███░░░░░░░░░░░░░░░░░   15% (basic version exists)
-Phase 5: Advanced Features       ░░░░░░░░░░░░░░░░░░░░    0% ⏳
+Phase 4: Advanced Features       ░░░░░░░░░░░░░░░░░░░░    0% ⏳
+Phase 5: Email Monitor           ░░░░░░░░░░░░░░░░░░░░    0% ⏳ OPTIONAL (Last)
 
-OVERALL PROJECT: ████████░░░░░░░░░░░░ 40%
+OVERALL PROJECT: ████████████░░░░░░░░ 50%
 ```
 
 ---
