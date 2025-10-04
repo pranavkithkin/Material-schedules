@@ -27,6 +27,7 @@ def create_app():
         chat_bp
     )
     from routes.uploads import uploads_bp
+    from routes.n8n_webhooks import n8n_bp
     
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(materials_bp, url_prefix='/api/materials')
@@ -36,6 +37,7 @@ def create_app():
     app.register_blueprint(ai_suggestions_bp, url_prefix='/api/ai_suggestions')
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
     app.register_blueprint(uploads_bp)
+    app.register_blueprint(n8n_bp, url_prefix='/api/n8n')
     
     # Create database tables
     with app.app_context():
