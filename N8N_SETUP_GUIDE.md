@@ -394,7 +394,7 @@ Webhook → Read File → Convert Base64 → Claude API → Parse Response → F
 
 ```bash
 # Test webhook with sample data
-curl -X POST http://localhost:5678/webhook-test/extract-delivery \
+curl -X POST https://n8n1.trart.uk/webhook-test/extract-delivery \
   -H "Content-Type: application/json" \
   -d '{
     "delivery_id": 999,

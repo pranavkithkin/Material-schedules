@@ -1,0 +1,310 @@
+{
+  "name": "Document Intelligence - Multi-Type Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "extract-delivery",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "extract-delivery"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\": true, \"message\": \"Document extraction started\"}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://host.docker.internal:5001/api/n8n/extract-pdf-from-file/{{ $json.body.file_id }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "j5mpyk725_PTd7lZ0v99CQSRuk4qsfj1PGbOJ18ziJY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-pdf-text",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4-turbo",
+        "options": {}
+      },
+      "id": "openrouter-gpt4-model",
+      "name": "GPT-4 Model (OpenRouter)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [850, 450],
+      "credentials": {
+        "openRouterApi": {
+          "id": "openrouter-credentials",
+          "name": "OpenRouter API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=Analyze this document and extract structured data.\n\nSTEP 1: Identify the document type:\n- 'purchase_order' - Purchase Order/LPO documents\n- 'delivery_note' - Delivery Note/Delivery Order documents  \n- 'invoice' - Invoice/Payment documents\n- 'material_submittal' - Material Submittal documents\n\nSTEP 2: Extract ALL relevant fields based on document type.\n\nFOR PURCHASE ORDERS/LPOs - Return this JSON structure:\n{\n  \"document_type\": \"purchase_order\",\n  \"po_number\": \"PO reference number\",\n  \"po_date\": \"Issue date in YYYY-MM-DD format\",\n  \"expected_delivery_date\": \"Expected delivery date in YYYY-MM-DD format\",\n  \"supplier_name\": \"Supplier company name\",\n  \"supplier_contact\": \"Phone number\",\n  \"supplier_email\": \"Email address\",\n  \"material_type\": \"Material type (e.g., DB, VRF, Cables)\",\n  \"total_amount\": 50000.00,\n  \"currency\": \"AED\",\n  \"payment_terms\": \"Payment terms text\",\n  \"delivery_terms\": \"Delivery terms text\",\n  \"items\": [\n    {\n      \"description\": \"Item description\",\n      \"quantity\": \"2\",\n      \"unit\": \"pcs\",\n      \"unit_price\": 25000.00\n    }\n  ],\n  \"notes\": \"Additional notes\"\n}\n\nFOR DELIVERY NOTES/ORDERS - Return this JSON structure:\n{\n  \"document_type\": \"delivery_note\",\n  \"po_number\": \"Related PO number\",\n  \"delivery_date\": \"Delivery date in YYYY-MM-DD format\",\n  \"delivery_location\": \"Delivery address\",\n  \"tracking_number\": \"Tracking/waybill number\",\n  \"carrier\": \"Transport company\",\n  \"received_by\": \"Receiver name\",\n  \"supplier_name\": \"Supplier name\",\n  \"items\": [\n    {\n      \"description\": \"Item description\",\n      \"quantity\": \"5\",\n      \"unit\": \"pcs\",\n      \"delivered\": true\n    }\n  ],\n  \"notes\": \"Special notes\"\n}\n\nFOR INVOICES - Return this JSON structure:\n{\n  \"document_type\": \"invoice\",\n  \"invoice_number\": \"Invoice number\",\n  \"invoice_date\": \"Invoice date in YYYY-MM-DD format\",\n  \"due_date\": \"Payment due date in YYYY-MM-DD format\",\n  \"po_reference\": \"Related PO number\",\n  \"supplier_name\": \"Supplier name\",\n  \"total_amount\": 50000.00,\n  \"paid_amount\": 25000.00,\n  \"payment_type\": \"Advance\",\n  \"currency\": \"AED\",\n  \"payment_terms\": \"Payment terms\",\n  \"items\": [\n    {\n      \"description\": \"Item description\",\n      \"quantity\": \"2\",\n      \"unit_price\": 25000.00,\n      \"amount\": 50000.00\n    }\n  ],\n  \"notes\": \"Payment notes\"\n}\n\nDOCUMENT TEXT TO ANALYZE:\n\n{{ $json.text }}\n\nCRITICAL RULES:\n1. Return ONLY the JSON object - no markdown, no code blocks, no explanations\n2. Use actual values from the document, not placeholder text\n3. If a field is not found, use null instead of placeholder text\n4. All amounts must be numbers (not strings)\n5. All dates must be in YYYY-MM-DD format\n6. The JSON must be valid and parseable",
+        "options": {
+          "systemMessage": "You are an intelligent document classification and extraction AI. Extract structured data from documents and return ONLY valid JSON with no markdown formatting, no code blocks, no explanations - just the raw JSON object."
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Agent - Document Extraction",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI Agent response\nconst agentResponse = $input.item.json;\n\n// Get webhook data for metadata\nconst webhookData = $('Webhook Trigger').item.json.body;\nconst pdfData = $('Extract PDF Text').item.json;\n\nconsole.log('AI Agent Response Type:', typeof agentResponse);\nconsole.log('AI Agent Response Keys:', Object.keys(agentResponse));\n\n// Extract response text from various possible AI Agent formats\nlet responseText = '';\n\n// AI Agent typically returns in 'output' field\nif (agentResponse.output) {\n  console.log('Format: AI Agent output field');\n  responseText = agentResponse.output;\n}\n// Sometimes in 'text' field\nelse if (agentResponse.text) {\n  console.log('Format: Direct text field');\n  responseText = agentResponse.text;\n}\n// Or direct response\nelse if (typeof agentResponse === 'string') {\n  console.log('Format: Direct string response');\n  responseText = agentResponse;\n}\n// Last resort: stringify\nelse {\n  console.log('Format: Unknown - stringifying');\n  responseText = JSON.stringify(agentResponse);\n}\n\nconsole.log('Extracted text length:', responseText.length);\nconsole.log('First 200 chars:', responseText.substring(0, 200));\n\n// Try to parse the JSON from response\nlet extractedData;\ntry {\n  // Remove markdown code blocks if present\n  let cleanText = responseText.trim();\n  \n  // Remove ```json and ``` markers\n  if (cleanText.startsWith('```json')) {\n    cleanText = cleanText.replace(/```json\\n?/, '').replace(/\\n?```$/, '');\n  } else if (cleanText.startsWith('```')) {\n    cleanText = cleanText.replace(/```\\n?/, '').replace(/\\n?```$/, '');\n  }\n  \n  // Try direct parsing first\n  extractedData = JSON.parse(cleanText);\n  console.log('✅ JSON parsed successfully');\n  console.log('Document Type:', extractedData.document_type);\n  \n} catch (error) {\n  console.log('❌ Direct parsing failed, trying regex extraction...');\n  \n  // If direct parsing fails, try to extract JSON using regex\n  const jsonMatch = responseText.match(/\\{[\\s\\S]*\\}/);\n  \n  if (jsonMatch) {\n    try {\n      extractedData = JSON.parse(jsonMatch[0]);\n      console.log('✅ JSON extracted via regex');\n    } catch (e) {\n      // Last resort: return error with full response for debugging\n      throw new Error(\n        `Failed to parse AI Agent response as JSON.\\n\\n` +\n        `Original Error: ${error.message}\\n` +\n        `Regex Error: ${e.message}\\n\\n` +\n        `Response Type: ${typeof agentResponse}\\n` +\n        `Response Keys: ${Object.keys(agentResponse).join(', ')}\\n\\n` +\n        `Raw Response (first 500 chars):\\n${responseText.substring(0, 500)}`\n      );\n    }\n  } else {\n    throw new Error(\n      `No JSON object found in AI Agent response.\\n\\n` +\n      `Response Type: ${typeof agentResponse}\\n` +\n      `Response Keys: ${Object.keys(agentResponse).join(', ')}\\n\\n` +\n      `Raw Response (first 500 chars):\\n${responseText.substring(0, 500)}`\n    );\n  }\n}\n\n// Determine document type and calculate confidence\nconst docType = extractedData.document_type || 'delivery_note';\nlet totalFields = 8;\nlet foundFields = 0;\n\n// Count fields based on document type\nif (docType === 'purchase_order') {\n  if (extractedData.po_number) foundFields++;\n  if (extractedData.po_date) foundFields++;\n  if (extractedData.expected_delivery_date) foundFields++;\n  if (extractedData.supplier_name) foundFields++;\n  if (extractedData.total_amount) foundFields++;\n  if (extractedData.currency) foundFields++;\n  if (extractedData.payment_terms) foundFields++;\n  if (extractedData.items && extractedData.items.length > 0) foundFields++;\n} else if (docType === 'invoice') {\n  if (extractedData.invoice_number) foundFields++;\n  if (extractedData.invoice_date) foundFields++;\n  if (extractedData.po_reference) foundFields++;\n  if (extractedData.supplier_name) foundFields++;\n  if (extractedData.total_amount) foundFields++;\n  if (extractedData.paid_amount) foundFields++;\n  if (extractedData.payment_type) foundFields++;\n  if (extractedData.items && extractedData.items.length > 0) foundFields++;\n} else { // delivery_note\n  if (extractedData.po_number) foundFields++;\n  if (extractedData.delivery_date) foundFields++;\n  if (extractedData.supplier_name) foundFields++;\n  if (extractedData.delivery_location) foundFields++;\n  if (extractedData.carrier) foundFields++;\n  if (extractedData.tracking_number) foundFields++;\n  if (extractedData.received_by) foundFields++;\n  if (extractedData.items && extractedData.items.length > 0) foundFields++;\n}\n\nconst confidence = Math.round((foundFields / totalFields) * 100);\n\nconsole.log('✅ Extraction complete');\nconsole.log('Document Type:', docType);\nconsole.log('Fields found:', foundFields + '/' + totalFields);\nconsole.log('Confidence:', confidence + '%');\n\n// Map to correct ID field based on document type\nlet recordId;\nif (docType === 'purchase_order') {\n  recordId = webhookData.po_id || webhookData.delivery_id; // fallback\n} else if (docType === 'invoice') {\n  recordId = webhookData.payment_id || webhookData.delivery_id; // fallback\n} else {\n  recordId = webhookData.delivery_id;\n}\n\nreturn {\n  json: {\n    // Dynamic ID field based on document type\n    delivery_id: docType === 'delivery_note' ? recordId : undefined,\n    po_id: docType === 'purchase_order' ? recordId : undefined,\n    payment_id: docType === 'invoice' ? recordId : undefined,\n    \n    file_id: webhookData.file_id,\n    po_ref: webhookData.po_ref,\n    document_type: docType,\n    extraction_status: 'completed',\n    extraction_confidence: confidence,\n    extracted_data: extractedData,\n    raw_response: responseText,\n    error_message: null\n  }\n};"
+      },
+      "id": "parse-response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.document_type }}",
+                    "rightValue": "purchase_order",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.document_type }}",
+                    "rightValue": "invoice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.document_type }}",
+                    "rightValue": "delivery_note",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-by-doc-type",
+      "name": "Route by Document Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/api/n8n/po-extraction",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "j5mpyk725_PTd7lZ0v99CQSRuk4qsfj1PGbOJ18ziJY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "send-po-to-flask",
+      "name": "Send PO to Flask",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/api/n8n/invoice-extraction",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "j5mpyk725_PTd7lZ0v99CQSRuk4qsfj1PGbOJ18ziJY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "send-invoice-to-flask",
+      "name": "Send Invoice to Flask",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/api/n8n/delivery-extraction",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "j5mpyk725_PTd7lZ0v99CQSRuk4qsfj1PGbOJ18ziJY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "send-delivery-to-flask",
+      "name": "Send Delivery to Flask",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.item.json;\nconst docType = $('Parse Response').item.json.document_type;\n\nconsole.log('✅ Document extraction completed');\nconsole.log('Document Type:', docType);\nconsole.log('Record ID:', result.delivery_id || result.po_id || result.payment_id);\nconsole.log('Confidence:', $('Parse Response').item.json.extraction_confidence + '%');\n\nlet recordType = 'Delivery';\nlet recordId = result.delivery_id;\n\nif (docType === 'purchase_order') {\n  recordType = 'Purchase Order';\n  recordId = result.po_id;\n} else if (docType === 'invoice') {\n  recordType = 'Invoice';\n  recordId = result.payment_id;\n}\n\nreturn {\n  json: {\n    success: true,\n    message: `${recordType} document processed successfully`,\n    document_type: docType,\n    record_type: recordType,\n    record_id: recordId,\n    confidence: $('Parse Response').item.json.extraction_confidence,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Respond Success", "type": "main", "index": 0}]]
+    },
+    "Respond Success": {
+      "main": [[{"node": "Extract PDF Text", "type": "main", "index": 0}]]
+    },
+    "Extract PDF Text": {
+      "main": [[{"node": "AI Agent - Document Extraction", "type": "main", "index": 0}]]
+    },
+    "GPT-4 Model (OpenRouter)": {
+      "ai_languageModel": [[{"node": "AI Agent - Document Extraction", "type": "ai_languageModel", "index": 0}]]
+    },
+    "AI Agent - Document Extraction": {
+      "main": [[{"node": "Parse Response", "type": "main", "index": 0}]]
+    },
+    "Parse Response": {
+      "main": [[{"node": "Route by Document Type", "type": "main", "index": 0}]]
+    },
+    "Route by Document Type": {
+      "main": [
+        [{"node": "Send PO to Flask", "type": "main", "index": 0}],
+        [{"node": "Send Invoice to Flask", "type": "main", "index": 0}],
+        [{"node": "Send Delivery to Flask", "type": "main", "index": 0}]
+      ]
+    },
+    "Send PO to Flask": {
+      "main": [[{"node": "Log Success", "type": "main", "index": 0}]]
+    },
+    "Send Invoice to Flask": {
+      "main": [[{"node": "Log Success", "type": "main", "index": 0}]]
+    },
+    "Send Delivery to Flask": {
+      "main": [[{"node": "Log Success", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-05T06:00:00.000Z",
+  "versionId": "10"
+}

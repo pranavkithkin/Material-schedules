@@ -77,6 +77,118 @@
         </div>
     </div>
 
+    <!-- AI Document Intelligence Statistics -->
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-gray-800">
+                <i class="fas fa-brain mr-2 text-blue-600"></i>
+                AI Document Intelligence
+            </h3>
+            <span class="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
+                <i class="fas fa-bolt mr-1"></i>POWERED BY GPT-4
+            </span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <!-- Success Rate -->
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-gray-600 font-medium">Success Rate</span>
+                    <i class="fas fa-check-circle text-green-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-gray-800" id="ai-success-rate">-</div>
+                <div class="text-xs text-gray-500 mt-1">Successful extractions</div>
+            </div>
+            
+            <!-- Total Extractions -->
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-gray-600 font-medium">Documents Processed</span>
+                    <i class="fas fa-file-pdf text-red-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-gray-800" id="ai-total-extractions">-</div>
+                <div class="text-xs text-gray-500 mt-1">
+                    <span class="text-green-600 font-semibold" id="ai-po-count">-</span> PO / 
+                    <span class="text-blue-600 font-semibold" id="ai-invoice-count">-</span> Invoice / 
+                    <span class="text-purple-600 font-semibold" id="ai-delivery-count">-</span> Delivery
+                </div>
+            </div>
+            
+            <!-- Average Confidence -->
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-gray-600 font-medium">Avg Confidence</span>
+                    <i class="fas fa-chart-line text-blue-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-gray-800" id="ai-avg-confidence">-</div>
+                <div class="text-xs text-gray-500 mt-1">AI confidence score</div>
+            </div>
+            
+            <!-- Items Extracted -->
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-gray-600 font-medium">Items Extracted</span>
+                    <i class="fas fa-boxes text-orange-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-gray-800" id="ai-total-items">-</div>
+                <div class="text-xs text-gray-500 mt-1">Total line items found</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Analytics Charts -->
+    <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-gray-800">
+                <i class="fas fa-chart-bar mr-2 text-purple-600"></i>
+                Visual Analytics
+            </h3>
+            <div class="flex space-x-2">
+                <button onclick="refreshCharts()" class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-lg hover:bg-purple-200 transition">
+                    <i class="fas fa-sync-alt mr-1"></i> Refresh
+                </button>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Payment Trends Chart -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-money-bill-wave mr-1 text-green-500"></i>
+                    Payment Trends (Last 6 Months)
+                </h4>
+                <canvas id="paymentTrendsChart" height="250"></canvas>
+            </div>
+            
+            <!-- Delivery Status Distribution -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-truck mr-1 text-blue-500"></i>
+                    Delivery Status Distribution
+                </h4>
+                <canvas id="deliveryStatusChart" height="250"></canvas>
+            </div>
+            
+            <!-- Materials by Type -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-layer-group mr-1 text-orange-500"></i>
+                    Top Materials by Value
+                </h4>
+                <canvas id="materialsByTypeChart" height="250"></canvas>
+            </div>
+            
+            <!-- PO Completion Rate -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-tasks mr-1 text-indigo-500"></i>
+                    Purchase Order Completion
+                </h4>
+                <canvas id="poCompletionChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-pkp-gold">
         <h3 class="text-xl font-bold text-pkp-green mb-4">
@@ -137,7 +249,11 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+// Chart instances
+let paymentTrendsChart, deliveryStatusChart, materialsByTypeChart, poCompletionChart;
+
 // Load dashboard statistics
 function loadDashboardStats() {
     $.ajax({
@@ -166,11 +282,193 @@ function loadDashboardStats() {
             if (data.ai_suggestions.pending > 0) {
                 $('#ai-badge').removeClass('hidden').text(data.ai_suggestions.pending);
             }
+
+            // AI Document Intelligence
+            $('#ai-success-rate').text(data.ai_document_intelligence.success_rate + '%');
+            $('#ai-total-extractions').text(data.ai_document_intelligence.total_extractions);
+            $('#ai-po-count').text(data.ai_document_intelligence.po_count);
+            $('#ai-invoice-count').text(data.ai_document_intelligence.invoice_count);
+            $('#ai-delivery-count').text(data.ai_document_intelligence.delivery_count);
+            $('#ai-avg-confidence').text(data.ai_document_intelligence.avg_confidence + '%');
+            $('#ai-total-items').text(data.ai_document_intelligence.total_items);
         },
         error: function(err) {
             console.error('Error loading dashboard stats:', err);
         }
     });
+}
+
+// Load and create charts
+function loadCharts() {
+    $.ajax({
+        url: '/api/dashboard/analytics',
+        method: 'GET',
+        success: function(data) {
+            createPaymentTrendsChart(data.payment_trends);
+            createDeliveryStatusChart(data.delivery_status);
+            createMaterialsByTypeChart(data.materials_by_type);
+            createPOCompletionChart(data.po_completion);
+        },
+        error: function(err) {
+            console.error('Error loading charts:', err);
+        }
+    });
+}
+
+function createPaymentTrendsChart(data) {
+    const ctx = document.getElementById('paymentTrendsChart');
+    if (paymentTrendsChart) paymentTrendsChart.destroy();
+    
+    paymentTrendsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Total Payments (AED)',
+                data: data.values || [0, 0, 0, 0, 0, 0],
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'AED ' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'AED ' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createDeliveryStatusChart(data) {
+    const ctx = document.getElementById('deliveryStatusChart');
+    if (deliveryStatusChart) deliveryStatusChart.destroy();
+    
+    deliveryStatusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels || ['Pending', 'In Transit', 'Completed', 'Delayed'],
+            datasets: [{
+                data: data.values || [0, 0, 0, 0],
+                backgroundColor: [
+                    'rgb(234, 179, 8)',  // Yellow - Pending
+                    'rgb(59, 130, 246)',  // Blue - In Transit
+                    'rgb(34, 197, 94)',   // Green - Completed
+                    'rgb(239, 68, 68)'    // Red - Delayed
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 15, font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+function createMaterialsByTypeChart(data) {
+    const ctx = document.getElementById('materialsByTypeChart');
+    if (materialsByTypeChart) materialsByTypeChart.destroy();
+    
+    materialsByTypeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels || ['Material 1', 'Material 2', 'Material 3'],
+            datasets: [{
+                label: 'Total Value (AED)',
+                data: data.values || [0, 0, 0],
+                backgroundColor: 'rgb(249, 115, 22)',
+                borderColor: 'rgb(234, 88, 12)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'AED ' + context.parsed.x.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'AED ' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createPOCompletionChart(data) {
+    const ctx = document.getElementById('poCompletionChart');
+    if (poCompletionChart) poCompletionChart.destroy();
+    
+    poCompletionChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels || ['Completed', 'In Progress', 'Not Started'],
+            datasets: [{
+                label: 'Purchase Orders',
+                data: data.values || [0, 0, 0],
+                backgroundColor: [
+                    'rgb(34, 197, 94)',
+                    'rgb(59, 130, 246)',
+                    'rgb(156, 163, 175)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function refreshCharts() {
+    loadCharts();
 }
 
 // Load upcoming deliveries
@@ -262,6 +560,7 @@ $(document).ready(function() {
     loadDashboardStats();
     loadUpcomingDeliveries();
     loadAlerts();
+    loadCharts();
     
     // Refresh every 30 seconds
     setInterval(function() {

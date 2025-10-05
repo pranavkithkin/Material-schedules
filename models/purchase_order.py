@@ -14,6 +14,7 @@ class PurchaseOrder(db.Model):
     quote_ref = db.Column(db.String(100))
     po_ref = db.Column(db.String(100), unique=True, nullable=False)
     po_date = db.Column(db.DateTime)
+    expected_delivery_date = db.Column(db.DateTime)  # Expected delivery date from PO
     supplier_name = db.Column(db.String(200), nullable=False)
     supplier_contact = db.Column(db.String(200))
     supplier_email = db.Column(db.String(200))
@@ -54,6 +55,7 @@ class PurchaseOrder(db.Model):
             'po_number': self.po_ref,  # Alias for template compatibility
             'issue_date': self.po_date.isoformat() if self.po_date else None,
             'po_date': self.po_date.isoformat() if self.po_date else None,
+            'expected_delivery_date': self.expected_delivery_date.isoformat() if self.expected_delivery_date else None,
             'supplier_name': self.supplier_name,
             'supplier_contact': self.supplier_contact,
             'supplier_email': self.supplier_email,

@@ -31,81 +31,362 @@
 </head>
 <body class="bg-pkp-gray">
     <!-- Navigation -->
-    <nav class="bg-pkp-green text-white shadow-lg">
+    <nav class="bg-pkp-green text-white shadow-lg fixed top-0 left-0 right-0 z-50">
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between py-4">
+                <!-- Logo and Title -->
                 <div class="flex items-center space-x-4">
                     <i class="fas fa-truck-loading text-2xl text-pkp-gold"></i>
-                    <h1 class="text-xl font-bold">Material Delivery Dashboard</h1>
+                    <h1 class="text-xl font-bold hidden md:block">Material Delivery Dashboard</h1>
+                    <h1 class="text-lg font-bold md:hidden">Material Dashboard</h1>
                 </div>
                 
-                <div class="flex items-center space-x-6">
-                    <a href="/" class="hover:text-pkp-gold transition">
-                        <i class="fas fa-home mr-1"></i> Dashboard
+                <!-- Main Navigation Links (Desktop) - Primary Items Always Visible -->
+                <div class="hidden lg:flex items-center space-x-1">
+                    <a href="/" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">
+                        <i class="fas fa-home text-lg group-hover:text-pkp-gold"></i>
+                        <span class="font-medium">Dashboard</span>
                     </a>
-                    <a href="/materials" class="hover:text-pkp-gold transition">
-                        <i class="fas fa-boxes mr-1"></i> Materials
+                    
+                    <a href="/materials" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">
+                        <i class="fas fa-boxes text-lg group-hover:text-pkp-gold"></i>
+                        <span class="font-medium">Materials</span>
                     </a>
-                    <a href="/purchase_orders" class="hover:text-pkp-gold transition">
-                        <i class="fas fa-file-invoice mr-1"></i> Purchase Orders
+                    
+                    <a href="/purchase_orders" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">
+                        <i class="fas fa-file-invoice text-lg group-hover:text-pkp-gold"></i>
+                        <span class="font-medium">Purchase Orders</span>
                     </a>
-                    <a href="/payments" class="hover:text-pkp-gold transition">
-                        <i class="fas fa-money-bill-wave mr-1"></i> Payments
+                    
+                    <a href="/payments" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">
+                        <i class="fas fa-money-bill-wave text-lg group-hover:text-pkp-gold"></i>
+                        <span class="font-medium">Payments</span>
                     </a>
-                    <a href="/deliveries" class="hover:text-pkp-gold transition">
-                        <i class="fas fa-shipping-fast mr-1"></i> Deliveries
+                    
+                    <a href="/deliveries" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">
+                        <i class="fas fa-shipping-fast text-lg group-hover:text-pkp-gold"></i>
+                        <span class="font-medium">Deliveries</span>
                     </a>
-                    <a href="/uploads" class="hover:text-pkp-gold transition">
-                        <i class="fas fa-cloud-upload-alt mr-1"></i> Uploads
-                    </a>
-                    <a href="/ai_suggestions" class="hover:text-pkp-gold transition relative">
-                        <i class="fas fa-robot mr-1"></i> AI Suggestions
-                        <span id="ai-badge" class="hidden absolute -top-2 -right-2 bg-pkp-gold text-pkp-green text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold"></span>
-                    </a>
+                    
+                    <!-- Hamburger Menu Button (Desktop - for secondary items only) -->
+                    <div class="relative">
+                        <button 
+                            id="sidebar-toggle-btn" 
+                            onclick="toggleSidebar()"
+                            class="ml-2 text-white hover:text-pkp-gold hover:bg-white hover:bg-opacity-10 px-3 py-2 rounded-lg transition focus:outline-none relative group"
+                            title="More Options">
+                            <i class="fas fa-ellipsis-v text-xl"></i>
+                            <span id="sidebar-badge" class="hidden absolute -top-1 -right-1 bg-pkp-gold text-pkp-green text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold animate-pulse"></span>
+                        </button>
+                    </div>
                 </div>
+                
+                <!-- Hamburger Menu Button (Mobile - for all items) -->
+                <button 
+                    id="sidebar-toggle-btn-mobile" 
+                    onclick="toggleSidebar()"
+                    class="lg:hidden text-white hover:text-pkp-gold transition focus:outline-none relative group"
+                    title="Menu">
+                    <i class="fas fa-bars text-2xl"></i>
+                    <span id="sidebar-badge-mobile" class="hidden absolute -top-1 -right-1 bg-pkp-gold text-pkp-green text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold animate-pulse"></span>
+                </button>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
+    <!-- Sidebar Overlay (Dark background when open) -->
+    <div 
+        id="sidebar-overlay" 
+        class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
+        onclick="toggleSidebar()">
+    </div>
+
+    <!-- Slide-out Sidebar Menu -->
+    <div 
+        id="sidebar-menu" 
+        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
+        
+        <!-- Sidebar Header -->
+        <div class="bg-gradient-to-r from-pkp-green to-pkp-gold text-white p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-ellipsis-h text-3xl"></i>
+                    <div>
+                        <h2 class="text-lg font-bold">More Options</h2>
+                        <p class="text-xs opacity-90">Tools & Settings</p>
+                    </div>
+                </div>
+                <button 
+                    onclick="toggleSidebar()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar Navigation Items -->
+        <nav class="py-4">
+            <!-- Mobile Only: Main Navigation (shown on mobile) -->
+            <div class="lg:hidden px-4 mb-6">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-4">Main Menu</h3>
+                
+                <a href="/" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group">
+                    <i class="fas fa-home text-xl text-pkp-green group-hover:text-pkp-gold w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">Dashboard</span>
+                </a>
+                
+                <a href="/materials" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group">
+                    <i class="fas fa-boxes text-xl text-pkp-green group-hover:text-pkp-gold w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">Materials</span>
+                </a>
+                
+                <a href="/purchase_orders" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group">
+                    <i class="fas fa-file-invoice text-xl text-pkp-green group-hover:text-pkp-gold w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">Purchase Orders</span>
+                </a>
+                
+                <a href="/payments" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group">
+                    <i class="fas fa-money-bill-wave text-xl text-pkp-green group-hover:text-pkp-gold w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">Payments</span>
+                </a>
+                
+                <a href="/deliveries" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group">
+                    <i class="fas fa-shipping-fast text-xl text-pkp-green group-hover:text-pkp-gold w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">Deliveries</span>
+                </a>
+                
+                <!-- Divider (Mobile only) -->
+                <div class="border-t border-gray-200 my-4"></div>
+            </div>
+
+            <!-- Tools & AI Section (Always shown - secondary items) -->
+            <div class="px-4 mb-6">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-4">Tools & AI</h3>
+                
+                <a href="/uploads" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group">
+                    <i class="fas fa-cloud-upload-alt text-xl text-blue-500 group-hover:text-blue-600 w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">File Uploads</span>
+                </a>
+                
+                <a href="/ai_suggestions" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group relative">
+                    <i class="fas fa-robot text-xl text-purple-500 group-hover:text-purple-600 w-6"></i>
+                    <span class="font-medium text-gray-700 group-hover:text-pkp-green">AI Suggestions</span>
+                    <span id="ai-badge-sidebar" class="hidden ml-auto bg-pkp-gold text-pkp-green text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold"></span>
+                </a>
+                
+                <a href="#" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group opacity-60 cursor-not-allowed">
+                    <i class="fas fa-chart-line text-xl text-green-500 w-6"></i>
+                    <span class="font-medium text-gray-700">Analytics</span>
+                    <span class="ml-auto bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">Soon</span>
+                </a>
+                
+                <a href="#" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group opacity-60 cursor-not-allowed">
+                    <i class="fas fa-bell text-xl text-orange-500 w-6"></i>
+                    <span class="font-medium text-gray-700">Notifications</span>
+                    <span class="ml-auto bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">Soon</span>
+                </a>
+            </div>
+
+            <!-- Divider -->
+            <div class="border-t border-gray-200 mx-4 my-4"></div>
+
+            <!-- Reports Section -->
+            <div class="px-4 mb-6">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-4">Reports</h3>
+                
+                <a href="#" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group opacity-60 cursor-not-allowed">
+                    <i class="fas fa-file-pdf text-xl text-red-500 w-6"></i>
+                    <span class="font-medium text-gray-700">Export Reports</span>
+                    <span class="ml-auto bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">Soon</span>
+                </a>
+                
+                <a href="#" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group opacity-60 cursor-not-allowed">
+                    <i class="fas fa-file-excel text-xl text-green-600 w-6"></i>
+                    <span class="font-medium text-gray-700">Excel Export</span>
+                    <span class="ml-auto bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">Soon</span>
+                </a>
+            </div>
+
+            <!-- Divider -->
+            <div class="border-t border-gray-200 mx-4 my-4"></div>
+
+            <!-- Settings Section -->
+            <div class="px-4">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-4">Settings</h3>
+                
+                <a href="#" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group opacity-60 cursor-not-allowed">
+                    <i class="fas fa-user-cog text-xl text-gray-600 w-6"></i>
+                    <span class="font-medium text-gray-700">Account Settings</span>
+                    <span class="ml-auto bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">Soon</span>
+                </a>
+                
+                <a href="#" class="flex items-center space-x-3 px-4 py-3 hover:bg-pkp-green hover:bg-opacity-10 rounded-lg transition group opacity-60 cursor-not-allowed">
+                    <i class="fas fa-cog text-xl text-gray-600 w-6"></i>
+                    <span class="font-medium text-gray-700">System Settings</span>
+                    <span class="ml-auto bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">Soon</span>
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content with top padding to account for fixed navbar -->
+    <main class="container mx-auto px-4 py-8 mt-20">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Chat Button -->
-    <button id="chat-btn" class="fixed bottom-6 right-6 bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white rounded-full p-4 shadow-lg transition z-50">
+    <!-- Floating Chat Button -->
+    <button id="chat-float-btn" class="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-4 rounded-full shadow-2xl transition-all duration-300 z-40 flex items-center space-x-2">
         <i class="fas fa-comments text-2xl"></i>
+        <span id="chat-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">1</span>
     </button>
 
-    <!-- Chat Panel -->
-    <div id="chat-panel" class="hidden fixed bottom-24 right-6 w-96 bg-white rounded-lg shadow-2xl z-50 border-2 border-pkp-green">
-        <div class="bg-pkp-green text-white p-4 rounded-t-lg flex justify-between items-center">
-            <h3 class="font-bold"><i class="fas fa-robot mr-2 text-pkp-gold"></i>AI Assistant</h3>
-            <button id="close-chat" class="hover:text-pkp-gold">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        
-        <div id="chat-messages" class="h-96 overflow-y-auto p-4 space-y-3">
-            <div class="text-gray-500 text-sm text-center">
-                Ask me anything about your materials, deliveries, or payments!
+    <!-- Chat Modal -->
+    <div id="chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-end justify-end z-50 p-6">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md h-[600px] flex flex-col transform transition-all duration-300">
+            <!-- Chat Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white bg-opacity-20 p-2 rounded-full">
+                        <i class="fas fa-robot text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg">AI Assistant</h3>
+                        <p class="text-xs text-blue-100">Ask me anything about your projects</p>
+                    </div>
+                </div>
+                <button onclick="closeChatModal()" class="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Chat Messages Container -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <!-- Welcome Message -->
+                <div class="flex items-start space-x-3 animate-fade-in">
+                    <div class="bg-blue-600 text-white p-2 rounded-full flex-shrink-0">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="bg-white rounded-2xl rounded-tl-none p-4 shadow-sm max-w-[80%]">
+                        <p class="text-gray-800 text-sm">
+                            👋 Hi! I'm your AI assistant. Ask me about:
+                        </p>
+                        <ul class="text-xs text-gray-600 mt-2 space-y-1">
+                            <li>• Delayed or pending deliveries</li>
+                            <li>• Payment status and invoices</li>
+                            <li>• Material approvals</li>
+                            <li>• Purchase order summaries</li>
+                        </ul>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <button onclick="sendSuggestedQuery('Show delayed deliveries')" class="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-100 transition">
+                                🚚 Delayed deliveries
+                            </button>
+                            <button onclick="sendSuggestedQuery('Payment status')" class="text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full hover:bg-green-100 transition">
+                                💰 Payment status
+                            </button>
+                            <button onclick="sendSuggestedQuery('Pending materials')" class="text-xs bg-purple-50 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-100 transition">
+                                📦 Pending materials
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="p-4 bg-white border-t border-gray-200 rounded-b-2xl">
+                <form id="chat-form" class="flex items-center space-x-2">
+                    <input 
+                        type="text" 
+                        id="chat-input" 
+                        placeholder="Type your question..." 
+                        class="flex-1 border border-gray-300 rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        autocomplete="off">
+                    <button 
+                        type="submit" 
+                        class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-3 rounded-full transition-all duration-300 flex-shrink-0 shadow-lg">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+                <p class="text-xs text-gray-400 mt-2 text-center">
+                    <i class="fas fa-shield-alt mr-1"></i>Powered by GPT-4 Intelligence
+                </p>
             </div>
         </div>
-        
-        <div class="p-4 border-t">
-            <form id="chat-form" class="flex space-x-2">
+    </div>
+
+    <!-- Sprint 2: Floating Chat Interface -->
+    <div id="chat-interface" class="hidden fixed bottom-20 right-6 w-96 bg-white rounded-lg shadow-2xl border-2 border-pkp-green z-50 flex flex-col" style="max-height: 600px;">
+        <!-- Chat Header -->
+        <div class="bg-gradient-to-r from-pkp-green to-pkp-gold text-white p-4 rounded-t-lg flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-robot text-2xl"></i>
+                <div>
+                    <h3 class="font-bold text-lg">AI Assistant</h3>
+                    <p class="text-xs opacity-90">Ask me anything about your data</p>
+                </div>
+            </div>
+            <button onclick="toggleChat()" class="text-white hover:text-gray-200 transition">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50" style="max-height: 400px;">
+            <!-- Welcome Message -->
+            <div class="flex items-start space-x-2">
+                <div class="bg-pkp-green text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-robot text-sm"></i>
+                </div>
+                <div class="bg-white rounded-lg p-3 shadow-sm max-w-[280px]">
+                    <p class="text-sm text-gray-800">👋 Hi! I'm your AI assistant. Ask me about:</p>
+                    <ul class="text-xs text-gray-600 mt-2 space-y-1">
+                        <li>• Delayed deliveries</li>
+                        <li>• Payment status</li>
+                        <li>• Material approvals</li>
+                        <li>• Purchase orders</li>
+                        <li>• Or anything else!</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="p-3 bg-white border-t border-gray-200 rounded-b-lg">
+            <div class="flex space-x-2">
                 <input 
                     type="text" 
                     id="chat-input" 
-                    placeholder="Type your question..." 
-                    class="flex-1 border border-pkp-green rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pkp-gold"
-                >
-                <button type="submit" class="bg-pkp-green hover:bg-pkp-gold hover:text-pkp-green text-white px-4 py-2 rounded-lg transition">
+                    placeholder="Ask a question..." 
+                    class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pkp-green"
+                    onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                <button 
+                    onclick="sendChatMessage()" 
+                    class="bg-pkp-green text-white px-4 py-2 rounded-lg hover:bg-pkp-gold hover:text-pkp-green transition">
                     <i class="fas fa-paper-plane"></i>
                 </button>
-            </form>
+            </div>
+            <!-- Quick Actions -->
+            <div class="flex flex-wrap gap-1 mt-2">
+                <button onclick="quickQuery('Show delayed deliveries')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition">
+                    🚚 Delayed
+                </button>
+                <button onclick="quickQuery('Payment status')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition">
+                    💰 Payments
+                </button>
+                <button onclick="quickQuery('Pending materials')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition">
+                    📦 Materials
+                </button>
+            </div>
         </div>
     </div>
+
+    <!-- Floating Chat Button -->
+    <button 
+        id="chat-toggle-btn"
+        onclick="toggleChat()" 
+        class="fixed bottom-6 right-6 bg-gradient-to-r from-pkp-green to-pkp-gold text-white w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:scale-110 z-50 flex items-center justify-center">
+        <i class="fas fa-comments text-2xl"></i>
+        <span id="chat-notification-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">1</span>
+    </button>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -114,6 +395,58 @@
             <span class="text-gray-700">Loading...</span>
         </div>
     </div>
+
+    <!-- Sprint 2: Global AI Processing Status Badge -->
+    <div id="ai-status-badge" class="hidden fixed top-20 right-6 bg-white rounded-lg shadow-lg border-2 z-40 min-w-[300px] max-w-[400px] animate-slide-in">
+        <div id="ai-status-header" class="flex items-center justify-between p-3 border-b">
+            <div class="flex items-center space-x-2">
+                <i id="ai-status-icon" class="fas fa-robot text-blue-500"></i>
+                <span id="ai-status-title" class="font-semibold text-sm">AI Processing</span>
+            </div>
+            <button onclick="closeAIStatus()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div id="ai-status-body" class="p-3">
+            <div id="ai-status-message" class="text-sm text-gray-700"></div>
+            <div id="ai-status-progress" class="hidden mt-2">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="ai-progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            <div id="ai-status-details" class="hidden mt-2 text-xs text-gray-500"></div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes slide-in {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .animate-slide-in {
+            animation: slide-in 0.3s ease-out;
+        }
+        
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+        .pulse-ring {
+            animation: pulse-ring 1.5s infinite;
+        }
+    </style>
 
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

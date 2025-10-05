@@ -65,6 +65,24 @@
     </div>
 </div>
 
+<!-- Extracted Data View Modal -->
+<div id="extracted-data-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-800">
+                <i class="fas fa-robot text-blue-600 mr-2"></i>AI Extracted Data
+            </h3>
+            <button onclick="closeExtractedDataModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div id="extracted-data-content" class="space-y-4">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
 <!-- Add/Edit Delivery Modal -->
 <div id="delivery-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -226,7 +244,10 @@ function displayDeliveries(deliveries) {
         
         const row = `
             <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 font-semibold text-gray-800">${delivery.purchase_order ? delivery.purchase_order.po_ref : '-'}</td>
+                <td class="px-6 py-4 font-semibold text-gray-800">
+                    ${delivery.purchase_order ? delivery.purchase_order.po_ref : '-'}
+                    ${delivery.extracted_data ? '<i class="fas fa-robot text-blue-500 ml-2" title="AI Extracted"></i>' : ''}
+                </td>
                 <td class="px-6 py-4 text-gray-600">${delivery.purchase_order && delivery.purchase_order.material ? delivery.purchase_order.material.material_type : '-'}</td>
                 <td class="px-6 py-4">
                     <span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">
@@ -245,6 +266,11 @@ function displayDeliveries(deliveries) {
                 <td class="px-6 py-4 text-gray-600 text-sm">${window.dashboardUtils.formatDate(delivery.expected_delivery_date)}</td>
                 <td class="px-6 py-4 text-gray-600 text-sm">${delivery.actual_delivery_date ? window.dashboardUtils.formatDate(delivery.actual_delivery_date) : '-'}</td>
                 <td class="px-6 py-4">
+                    ${delivery.extracted_data ? `
+                        <button onclick="viewExtractedData(${delivery.id})" class="text-blue-600 hover:text-blue-800 mr-3" title="View AI Extraction">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    ` : ''}
                     <button onclick="editDelivery(${delivery.id})" class="text-orange-600 hover:text-orange-800 mr-3">
                         <i class="fas fa-edit"></i>
                     </button>
@@ -541,5 +567,390 @@ $('#filter-status, #search-box').on('change keyup', function() {
 $(document).ready(function() {
     loadDeliveries();
 });
+
+function viewExtractedData(id) {
+    const delivery = allDeliveries.find(d => d.id === id);
+    if (!delivery || !delivery.extracted_data) return;
+    
+    const content = $('#extracted-data-content');
+    content.empty();
+    
+    // Header with extraction metadata
+    const metadata = `
+        <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 mb-4">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">${delivery.extraction_confidence || 0}%</div>
+                    <div class="text-xs text-gray-600 uppercase">Confidence Score</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">${delivery.extracted_item_count || 0}</div>
+                    <div class="text-xs text-gray-600 uppercase">Items Found</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold ${delivery.extraction_status === 'completed' ? 'text-green-600' : 'text-yellow-600'}">
+                        <i class="fas fa-${delivery.extraction_status === 'completed' ? 'check-circle' : 'clock'}"></i>
+                    </div>
+                    <div class="text-xs text-gray-600 uppercase">${delivery.extraction_status || 'Unknown'}</div>
+                </div>
+            </div>
+            ${delivery.extraction_date ? `
+                <div class="text-center mt-2 text-xs text-gray-500">
+                    <i class="fas fa-calendar-check mr-1"></i>
+                    Extracted on ${window.dashboardUtils.formatDate(delivery.extraction_date)}
+                </div>
+            ` : ''}
+        </div>
+    `;
+    content.append(metadata);
+    
+    // Check if extracted_data has items array
+    const items = delivery.extracted_data?.items || [];
+    
+    if (items.length === 0) {
+        content.append(`
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                    <span class="text-yellow-800">No items found in extracted data</span>
+                </div>
+            </div>
+        `);
+        $('#extracted-data-modal').removeClass('hidden');
+        return;
+    }
+    
+    // Items header
+    content.append(`
+        <div class="flex justify-between items-center mb-3">
+            <h4 class="text-lg font-semibold text-gray-800">Extracted Items</h4>
+            <span class="text-sm text-gray-500">${items.length} item${items.length !== 1 ? 's' : ''}</span>
+        </div>
+    `);
+    
+    // Display each item with enhanced formatting
+    items.forEach((item, index) => {
+        const deliveredBadge = item.delivered ? 
+            '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full"><i class="fas fa-check mr-1"></i>Delivered</span>' :
+            '<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full"><i class="fas fa-clock mr-1"></i>Pending</span>';
+        
+        const itemHtml = `
+            <div class="bg-white border-2 border-gray-200 hover:border-blue-300 p-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-center">
+                        <span class="bg-blue-100 text-blue-800 font-bold rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">
+                            ${index + 1}
+                        </span>
+                        <span class="font-semibold text-gray-900">${item.item_description || 'N/A'}</span>
+                    </div>
+                    ${deliveredBadge}
+                </div>
+                <div class="grid grid-cols-2 gap-3 ml-8">
+                    <div class="flex items-center text-sm">
+                        <i class="fas fa-box text-gray-400 mr-2 w-4"></i>
+                        <span class="text-gray-600">Quantity:</span>
+                        <span class="ml-1 font-semibold text-gray-900">${item.quantity || 0} ${item.unit || ''}</span>
+                    </div>
+                    ${item.price ? `
+                        <div class="flex items-center text-sm">
+                            <i class="fas fa-dollar-sign text-gray-400 mr-2 w-4"></i>
+                            <span class="text-gray-600">Price:</span>
+                            <span class="ml-1 font-semibold text-gray-900">${item.price}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        content.append(itemHtml);
+    });
+    
+    // Summary footer
+    const deliveredCount = items.filter(item => item.delivered).length;
+    const totalQuantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+    
+    const summary = `
+        <div class="bg-gray-50 border-t-2 border-gray-200 p-4 rounded-lg mt-4">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <span class="text-gray-600">Delivery Progress:</span>
+                    <div class="flex items-center mt-1">
+                        <div class="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: ${(deliveredCount / items.length * 100)}%"></div>
+                        </div>
+                        <span class="font-semibold">${deliveredCount}/${items.length}</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-gray-600">Total Quantity:</span>
+                    <div class="font-semibold text-lg mt-1">${totalQuantity.toFixed(2)} units</div>
+                </div>
+            </div>
+        </div>
+    `;
+    content.append(summary);
+    
+    $('#extracted-data-modal').removeClass('hidden');
+}
+
+function closeExtractedDataModal() {
+    $('#extracted-data-modal').addClass('hidden');
+}
+
+// Sprint 2: Document Upload with Smart AI Processing
+$('#delivery-document').on('change', async function(e) {
+    const file = e.target.files[0];
+    
+    if (!file) return;
+    
+    if (file.type !== 'application/pdf') {
+        window.dashboardUtils.showToast('Please upload a PDF file', 'error');
+        return;
+    }
+    
+    // Show global AI status badge
+    window.aiStatusBadge.show(
+        'Document Upload',
+        `<strong>${file.name}</strong><br>Preparing to upload...`,
+        'uploading'
+    );
+    window.aiStatusBadge.updateProgress(10, 'Initializing...');
+    
+    try {
+        // Step 1: Upload file
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('entity_type', 'delivery');
+        
+        window.aiStatusBadge.updateProgress(30, 'Uploading document...');
+        
+        const uploadResponse = await fetch('/api/uploads/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error('File upload failed');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        const fileId = uploadData.file_id;
+        
+        // Step 2: Update status - AI Processing
+        window.aiStatusBadge.show(
+            'AI Analysis',
+            `<strong>Analyzing delivery order...</strong><br>This may take 10-30 seconds`,
+            'analyzing'
+        );
+        window.aiStatusBadge.updateProgress(50, 'AI is reading your document...');
+        
+        // Step 3: Trigger AI extraction via n8n
+        const extractionResponse = await fetch('{{ config.N8N_WEBHOOK_URL }}/webhook/extract-delivery', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                file_id: fileId,
+                delivery_id: $('#delivery-id').val() || null,
+                po_id: $('#purchase-order-id').val()
+            })
+        });
+        
+        if (!extractionResponse.ok) {
+            throw new Error('AI extraction failed');
+        }
+        
+        window.aiStatusBadge.updateProgress(80, 'Processing extraction results...');
+        
+        const extractionData = await extractionResponse.json();
+        
+        // Step 4: Handle extraction result based on confidence
+        window.aiStatusBadge.updateProgress(100, 'Complete!');
+        await handleExtractionResult(extractionData, fileId);
+        
+        // Show success badge briefly
+        window.aiStatusBadge.show(
+            'Extraction Complete',
+            `Found ${extractionData.extracted_data?.items?.length || 0} items with ${extractionData.confidence}% confidence`,
+            'success'
+        );
+        window.aiStatusBadge.hideProgress();
+        window.aiStatusBadge.autoClose(4000);
+        
+    } catch (error) {
+        console.error('Document processing error:', error);
+        window.aiStatusBadge.show(
+            'Processing Error',
+            `Failed to process document: ${error.message}`,
+            'error'
+        );
+        window.aiStatusBadge.hideProgress();
+        window.aiStatusBadge.autoClose(5000);
+        
+        $('#extraction-status-container').removeClass('hidden').html(`
+            <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                    <span class="text-red-700 text-sm">Error: ${error.message}</span>
+                </div>
+            </div>
+        `);
+    }
+});
+
+// Smart extraction result handler with confidence-based workflow
+async function handleExtractionResult(extractionData, fileId) {
+    const confidence = extractionData.confidence || 0;
+    const extracted = extractionData.extracted_data || {};
+    const items = extracted.items || [];
+    
+    // Display confidence and item count
+    $('#extraction-status-container').html(`
+        <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-check-circle text-green-500"></i>
+                    <span class="text-sm font-semibold text-gray-800">
+                        Extraction Complete!
+                    </span>
+                </div>
+                <span class="text-xs bg-blue-500 text-white px-3 py-1 rounded-full font-bold">
+                    ${confidence}% Confidence
+                </span>
+            </div>
+            <div class="text-xs text-gray-600">
+                Found ${items.length} items | ${extracted.delivery_order_number || 'N/A'}
+            </div>
+        </div>
+        
+        <!-- Extracted Items Preview -->
+        <div id="extracted-items" class="mt-3">
+            <div class="text-xs font-semibold text-gray-600 mb-2 flex items-center">
+                <i class="fas fa-list mr-2"></i>Extracted Items:
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                ${items.map((item, idx) => `
+                    <div class="flex items-center justify-between text-sm bg-white p-2 rounded border">
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-blue-100 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                                ${idx + 1}
+                            </span>
+                            <span class="font-medium text-gray-800">${item.item_description || 'N/A'}</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-gray-600">${item.quantity || 0} ${item.unit || ''}</span>
+                            ${item.delivered ? 
+                                '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">✓ Delivered</span>' :
+                                '<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">⏳ Pending</span>'
+                            }
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `);
+    
+    // SMART WORKFLOW: Confidence-based decision
+    if (confidence >= 95) {
+        // HIGH CONFIDENCE: Auto-fill + Auto-validate + Auto-save
+        await autoFillAndValidate(extracted, fileId, confidence, true);
+    } else if (confidence >= 85) {
+        // MEDIUM CONFIDENCE: Auto-fill + Show review prompt
+        await autoFillAndValidate(extracted, fileId, confidence, false);
+        
+        $('#extraction-status-container').append(`
+            <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mt-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-info-circle text-yellow-600"></i>
+                        <span class="text-sm text-yellow-800 font-medium">
+                            Please review the extracted data before saving
+                        </span>
+                    </div>
+                    <button onclick="validateAndSave()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-1 rounded text-sm font-semibold transition">
+                        <i class="fas fa-check mr-1"></i>Review & Save
+                    </button>
+                </div>
+            </div>
+        `);
+    } else {
+        // LOW CONFIDENCE: Auto-fill + Require manual review
+        await autoFillAndValidate(extracted, fileId, confidence, false);
+        
+        $('#extraction-status-container').append(`
+            <div class="bg-orange-50 border border-orange-300 rounded-lg p-3 mt-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-exclamation-triangle text-orange-600"></i>
+                    <span class="text-sm text-orange-800 font-medium">
+                        Low confidence extraction - Please verify all fields carefully
+                    </span>
+                </div>
+                <div class="mt-2 text-xs text-orange-700">
+                    The AI is not very confident about this extraction. Please double-check all values.
+                </div>
+            </div>
+        `);
+    }
+}
+
+// Auto-fill form with extracted data and optionally auto-save
+async function autoFillAndValidate(extracted, fileId, confidence, autoSave) {
+    // Auto-fill form fields
+    if (extracted.delivery_order_number) {
+        $('#delivery-note-number').val(extracted.delivery_order_number);
+    }
+    
+    if (extracted.delivery_date) {
+        const date = new Date(extracted.delivery_date).toISOString().split('T')[0];
+        $('#actual-delivery-date').val(date);
+    }
+    
+    if (extracted.notes) {
+        $('#notes').val(extracted.notes);
+    }
+    
+    // Calculate delivery percentage from items
+    const items = extracted.items || [];
+    if (items.length > 0) {
+        const deliveredCount = items.filter(item => item.delivered).length;
+        const percentage = Math.round((deliveredCount / items.length) * 100);
+        $('#delivery-percentage').val(percentage);
+        
+        // Auto-set status based on percentage
+        if (percentage === 100) {
+            $('#delivery-status').val('Delivered');
+        } else if (percentage > 0) {
+            $('#delivery-status').val('Partial');
+        }
+    }
+    
+    // Store extracted data for later use
+    window.currentExtractionData = {
+        file_id: fileId,
+        confidence: confidence,
+        data: extracted
+    };
+    
+    // If auto-save is enabled (high confidence), validate and save automatically
+    if (autoSave) {
+        $('#extraction-status-container').append(`
+            <div class="bg-green-50 border border-green-300 rounded-lg p-3 mt-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-magic text-green-600 animate-pulse"></i>
+                    <span class="text-sm text-green-800 font-semibold">
+                        High confidence detected! Auto-validating and saving...
+                    </span>
+                </div>
+            </div>
+        `);
+        
+        // Wait 1 second for user to see the message
+        setTimeout(() => {
+            validateAndSave();
+        }, 1500);
+    }
+}
+
+// ...existing code...
 </script>
 {% endblock %}
