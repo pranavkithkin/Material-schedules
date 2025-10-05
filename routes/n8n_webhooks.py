@@ -262,7 +262,7 @@ def get_pending_reviews():
         suggestions = AISuggestion.query.filter(
             AISuggestion.status == 'pending',
             AISuggestion.confidence_score < confidence_max
-        ).order_by(AISuggestion.created_date.desc()).limit(limit).all()
+        ).order_by(AISuggestion.created_at.desc()).limit(limit).all()
         
         return jsonify({
             'success': True,
@@ -303,7 +303,7 @@ def get_n8n_stats():
         from datetime import timedelta
         yesterday = datetime.now() - timedelta(days=1)
         recent_suggestions = AISuggestion.query.filter(
-            AISuggestion.created_date >= yesterday
+            AISuggestion.created_at >= yesterday
         ).count()
         
         return jsonify({
@@ -714,12 +714,14 @@ def receive_po_extraction():
             extracted = data['extracted_data']
             
             # Update PO fields from extracted data
-            if 'po_number' in extracted and not po.po_ref:
-                po.po_ref = extracted['po_number']
+            # ALWAYS update po_ref with extracted po_number (override existing)
+            if 'po_number' in extracted:
+                po.po_ref = extracted['po_number']  # Only update po_ref (po_number doesn't exist in schema)
             
             if 'po_date' in extracted:
                 try:
                     po.po_date = datetime.fromisoformat(extracted['po_date'])
+                    po.issue_date = datetime.fromisoformat(extracted['po_date'])  # Update issue_date too
                 except:
                     pass
             

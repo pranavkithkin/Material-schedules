@@ -8,6 +8,8 @@ from models.payment import Payment
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 import calendar
+import os
+import requests
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -85,68 +87,55 @@ def dashboard_stats():
         # Total PO value
         total_po_value = db.session.query(func.sum(PurchaseOrder.total_amount)).scalar() or 0
         
-        # AI Document Intelligence Stats (Sprint 2)
-        # Count documents with extracted data
-        from models.payment import Payment
+        # AI Document Intelligence stats
+        total_extractions = Delivery.query.filter(
+            Delivery.extraction_status == 'completed'
+        ).count()
         
-        po_with_extraction = PurchaseOrder.query.filter(PurchaseOrder.extracted_data.isnot(None)).count()
-        payment_with_extraction = Payment.query.filter(Payment.extracted_data.isnot(None)).count()
-        delivery_with_extraction = Delivery.query.filter(Delivery.extracted_data.isnot(None)).count()
+        # Count successful extractions (confidence >= 80%)
+        successful_extractions = Delivery.query.filter(
+            Delivery.extraction_status == 'completed',
+            Delivery.extraction_confidence >= 80
+        ).count()
         
-        total_extractions = po_with_extraction + payment_with_extraction + delivery_with_extraction
+        # Calculate success rate
+        success_rate = round((successful_extractions / total_extractions * 100), 1) if total_extractions > 0 else 0
         
-        # Calculate success rate (documents with extraction_status = 'completed')
-        po_successful = PurchaseOrder.query.filter_by(extraction_status='completed').count()
-        payment_successful = Payment.query.filter_by(extraction_status='completed').count()
-        delivery_successful = Delivery.query.filter_by(extraction_status='completed').count()
-        total_successful = po_successful + payment_successful + delivery_successful
-        
-        success_rate = round((total_successful / total_extractions * 100) if total_extractions > 0 else 0)
-        
-        # Calculate average confidence
-        po_confidences = db.session.query(PurchaseOrder.extraction_confidence).filter(
-            PurchaseOrder.extraction_confidence.isnot(None)
-        ).all()
-        payment_confidences = db.session.query(Payment.extraction_confidence).filter(
-            Payment.extraction_confidence.isnot(None)
-        ).all()
-        delivery_confidences = db.session.query(Delivery.extraction_confidence).filter(
-            Delivery.extraction_confidence.isnot(None)
-        ).all()
-        
-        all_confidences = [c[0] for c in po_confidences + payment_confidences + delivery_confidences if c[0] is not None]
-        avg_confidence = round(sum(all_confidences) / len(all_confidences)) if all_confidences else 0
-        
-        # Calculate total items extracted
-        po_items = db.session.query(func.sum(PurchaseOrder.extracted_item_count)).filter(
-            PurchaseOrder.extracted_item_count.isnot(None)
+        # Average confidence
+        avg_confidence = db.session.query(
+            func.avg(Delivery.extraction_confidence)
+        ).filter(
+            Delivery.extraction_status == 'completed'
         ).scalar() or 0
-        payment_items = db.session.query(func.sum(Payment.extracted_item_count)).filter(
-            Payment.extracted_item_count.isnot(None)
-        ).scalar() or 0
-        delivery_items = db.session.query(func.sum(Delivery.extracted_item_count)).filter(
-            Delivery.extracted_item_count.isnot(None)
-        ).scalar() or 0
+        avg_confidence = round(avg_confidence, 1)
         
-        total_items = int(po_items + payment_items + delivery_items)
+        # Total items extracted
+        total_items = db.session.query(
+            func.sum(Delivery.extracted_item_count)
+        ).scalar() or 0
         
         return jsonify({
+            'materials_count': total_materials,
             'materials': {
                 'total': total_materials,
                 'approved': approved_materials,
                 'pending': pending_materials
             },
+            'purchase_orders_count': total_pos,
             'purchase_orders': {
                 'total': total_pos,
                 'released': released_pos,
                 'total_value': total_po_value
             },
+            'deliveries_count': total_deliveries,
             'deliveries': {
                 'total': total_deliveries,
                 'pending': pending_deliveries,
                 'delayed': delayed_deliveries,
                 'completed': completed_deliveries
             },
+            'payments_count': Payment.query.count(),
+            'ai_suggestions_count': pending_suggestions,
             'ai_suggestions': {
                 'pending': pending_suggestions,
                 'high_confidence': high_confidence_suggestions
@@ -154,11 +143,11 @@ def dashboard_stats():
             'ai_document_intelligence': {
                 'success_rate': success_rate,
                 'total_extractions': total_extractions,
-                'po_count': po_with_extraction,
-                'invoice_count': payment_with_extraction,
-                'delivery_count': delivery_with_extraction,
+                'po_count': 0,  # Will be implemented when PO extraction is added
+                'invoice_count': 0,  # Will be implemented when invoice extraction is added
+                'delivery_count': total_extractions,
                 'avg_confidence': avg_confidence,
-                'total_items': total_items
+                'total_items': int(total_items)
             }
         })
     except Exception as e:
@@ -189,6 +178,89 @@ def dashboard_analytics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@dashboard_bp.route('/api/dashboard/n8n-status')
+def n8n_status():
+    """Check if n8n and AI features are available"""
+    
+    status = {
+        'n8n_live': False,
+        'ai_features_available': False,
+        'mode': 'manual',
+        'last_checked': datetime.now().isoformat(),
+        'details': {}
+    }
+    
+    try:
+        # Check if n8n URL is configured
+        n8n_url = os.getenv('N8N_WEBHOOK_URL', '')
+        
+        if not n8n_url:
+            status['details']['message'] = 'n8n URL not configured'
+            return jsonify(status)
+        
+        status['details']['n8n_url'] = n8n_url
+        
+        # Try to ping n8n health endpoint (with timeout)
+        try:
+            response = requests.get(
+                f"{n8n_url}/healthz",
+                timeout=5,  # 5 second timeout
+                verify=True  # Verify SSL certificates
+            )
+            
+            if response.status_code == 200:
+                status['n8n_live'] = True
+                status['details']['n8n_status'] = 'online'
+                status['details']['n8n_response'] = response.json() if response.headers.get('content-type') == 'application/json' else 'OK'
+            else:
+                status['details']['n8n_status'] = f'HTTP {response.status_code}'
+                
+        except requests.exceptions.Timeout:
+            status['details']['n8n_status'] = 'timeout (>5s)'
+        except requests.exceptions.SSLError as e:
+            status['details']['n8n_status'] = f'SSL error: {str(e)[:50]}'
+        except requests.exceptions.ConnectionError as e:
+            status['details']['n8n_status'] = f'connection error: {str(e)[:50]}'
+        except Exception as e:
+            status['details']['n8n_status'] = f'error: {str(e)[:50]}'
+        
+        # Check if AI API keys are configured
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY', '')
+        openai_key = os.getenv('OPENAI_API_KEY', '')
+        openrouter_key = os.getenv('OPENROUTER_API_KEY', '')
+        
+        ai_configured = bool(anthropic_key or openai_key or openrouter_key)
+        
+        if ai_configured:
+            status['details']['ai_api'] = 'configured'
+            if anthropic_key:
+                status['details']['ai_provider'] = 'Anthropic Claude'
+            elif openai_key:
+                status['details']['ai_provider'] = 'OpenAI'
+            elif openrouter_key:
+                status['details']['ai_provider'] = 'OpenRouter'
+        else:
+            status['details']['ai_api'] = 'not configured'
+        
+        # Both n8n and AI must be available for AI features
+        status['ai_features_available'] = status['n8n_live'] and ai_configured
+        
+        # Set mode
+        if status['ai_features_available']:
+            status['mode'] = 'ai_assisted'
+            status['details']['message'] = 'AI document processing available ✓'
+        elif status['n8n_live'] and not ai_configured:
+            status['mode'] = 'partial'
+            status['details']['message'] = 'n8n online but AI API not configured'
+        else:
+            status['mode'] = 'manual'
+            status['details']['message'] = 'Manual mode only - AI features unavailable'
+        
+    except Exception as e:
+        status['details']['error'] = str(e)
+    
+    return jsonify(status)
+
 def get_payment_trends():
     """Get payment trends for the last 6 months"""
     today = datetime.now()
@@ -208,8 +280,8 @@ def get_payment_trends():
         month_name = calendar.month_abbr[month]
         labels.append(month_name)
         
-        # Sum payments for this month
-        total = db.session.query(func.sum(Payment.amount)).filter(
+        # Sum payments for this month - use paid_amount field
+        total = db.session.query(func.sum(Payment.paid_amount)).filter(
             extract('month', Payment.payment_date) == month,
             extract('year', Payment.payment_date) == year
         ).scalar() or 0
@@ -234,12 +306,12 @@ def get_top_materials():
     """Get top 5 materials by total value"""
     # Join with PO to get material values
     results = db.session.query(
-        Material.material_description,
+        Material.description,
         func.sum(PurchaseOrder.total_amount).label('total_value')
     ).join(
         PurchaseOrder, Material.id == PurchaseOrder.material_id
     ).group_by(
-        Material.material_description
+        Material.description
     ).order_by(
         func.sum(PurchaseOrder.total_amount).desc()
     ).limit(5).all()

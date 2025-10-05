@@ -41,6 +41,52 @@
                     <h1 class="text-lg font-bold md:hidden">Material Dashboard</h1>
                 </div>
                 
+                <!-- AI Status Indicator (Center-Right) - Beautiful Design -->
+                <div class="flex-1 flex justify-end items-center mr-6 hidden md:flex">
+                    <div id="global-ai-status" class="group relative">
+                        <!-- Status Pill -->
+                        <div class="flex items-center space-x-2 bg-white bg-opacity-20 backdrop-blur-sm rounded-full px-4 py-2 border border-white border-opacity-30 hover:bg-opacity-30 transition-all duration-300 cursor-pointer shadow-lg">
+                            <!-- Animated Status Light with Glow -->
+                            <div class="relative flex items-center justify-center">
+                                <div id="global-status-light" class="w-2.5 h-2.5 rounded-full bg-gray-400 z-10"></div>
+                                <!-- Pulse ring animation -->
+                                <div id="global-status-ring" class="absolute w-2.5 h-2.5 rounded-full bg-gray-400 opacity-75 animate-ping"></div>
+                            </div>
+                            
+                            <!-- Status Content -->
+                            <div class="flex items-center space-x-2">
+                                <i id="global-status-icon" class="fas fa-robot text-sm text-white"></i>
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] text-white text-opacity-70 font-medium uppercase tracking-wider">AI Features</span>
+                                    <span id="global-status-text" class="text-xs font-bold text-white">Checking...</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Hover Tooltip -->
+                        <div id="global-status-tooltip" class="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-2xl border border-gray-200 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                            <div class="flex items-start space-x-2">
+                                <i id="tooltip-icon" class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                                <div class="flex-1">
+                                    <p id="tooltip-message" class="text-xs text-gray-700 font-medium mb-1">Checking AI status...</p>
+                                    <div id="tooltip-details" class="text-[10px] text-gray-500 space-y-0.5">
+                                        <div class="flex justify-between">
+                                            <span>n8n Workflow:</span>
+                                            <span id="tooltip-n8n" class="font-semibold">—</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>AI API:</span>
+                                            <span id="tooltip-ai-api" class="font-semibold">—</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Arrow pointer -->
+                            <div class="absolute -top-1 right-6 w-2 h-2 bg-white border-l border-t border-gray-200 transform rotate-45"></div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Main Navigation Links (Desktop) - Primary Items Always Visible -->
                 <div class="hidden lg:flex items-center space-x-1">
                     <a href="/" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">

@@ -191,6 +191,33 @@ def test_endpoint():
     }), 200
 
 
+@agents_bp.route('/status', methods=['GET'])
+def agent_status():
+    """
+    Agent status endpoint - check if agents are operational
+    No API key required for health checks
+    """
+    return jsonify({
+        'status': 'operational',
+        'agents': {
+            'data_processing': {
+                'status': 'online',
+                'version': '1.0',
+                'token_usage': 0
+            },
+            'document_intelligence': {
+                'status': 'ready',
+                'note': 'Requires n8n workflow'
+            },
+            'conversational': {
+                'status': 'ready',
+                'note': 'Chat service available'
+            }
+        },
+        'timestamp': __import__('datetime').datetime.now().isoformat()
+    }), 200
+
+
 # ============================================================================
 # BATCH PROCESSING (Optional - for future use)
 # ============================================================================

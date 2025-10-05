@@ -146,6 +146,12 @@ $(document).ready(function() {
             $(this).addClass('font-bold border-b-2 border-white');
         }
     });
+
+    // Check AI status immediately on page load
+    checkGlobalAIStatus();
+    
+    // Check AI status every 30 seconds
+    setInterval(checkGlobalAIStatus, 30000);
 });
 
 // Export for use in other scripts
@@ -243,4 +249,96 @@ window.aiStatusBadge = {
 
 function closeAIStatus() {
     window.aiStatusBadge.hide();
+}
+
+// Global AI Status Checker (works on all pages)
+function checkGlobalAIStatus() {
+    $.ajax({
+        url: '/api/dashboard/n8n-status',
+        method: 'GET',
+        timeout: 5000,
+        success: function(data) {
+            updateGlobalAIIndicator(data);
+        },
+        error: function() {
+            // If check fails, show offline
+            updateGlobalAIIndicator({
+                n8n_live: false,
+                ai_features_available: false,
+                mode: 'manual',
+                details: { message: 'Unable to check status' }
+            });
+        }
+    });
+}
+
+function updateGlobalAIIndicator(status) {
+    const light = $('#global-status-light');
+    const ring = $('#global-status-ring');
+    const text = $('#global-status-text');
+    const icon = $('#global-status-icon');
+    
+    // Tooltip elements
+    const tooltipMessage = $('#tooltip-message');
+    const tooltipIcon = $('#tooltip-icon');
+    const tooltipN8n = $('#tooltip-n8n');
+    const tooltipAIAPI = $('#tooltip-ai-api');
+    
+    if (status.ai_features_available) {
+        // GREEN - AI Features Online
+        light.removeClass('bg-gray-400 bg-red-500 bg-yellow-500')
+             .addClass('bg-green-500');
+        ring.removeClass('bg-gray-400 bg-red-500 bg-yellow-500')
+            .addClass('bg-green-500 animate-ping');
+        text.text('Online').removeClass('text-white text-opacity-70').addClass('text-white');
+        icon.removeClass('text-gray-400 text-red-400 text-yellow-400').addClass('text-white');
+        
+        // Update tooltip
+        tooltipMessage.text('✓ All AI-powered automation features are operational');
+        tooltipIcon.removeClass('text-red-500 text-yellow-500 text-gray-500')
+                   .addClass('text-green-500');
+        tooltipN8n.text('Online ✓').removeClass('text-red-600 text-yellow-600 text-gray-600')
+                  .addClass('text-green-600');
+        tooltipAIAPI.text('Configured ✓')
+                    .removeClass('text-red-600 text-yellow-600 text-gray-600')
+                    .addClass('text-green-600');
+        
+    } else if (status.n8n_live && !status.ai_features_available) {
+        // YELLOW - n8n online but AI not configured
+        light.removeClass('bg-gray-400 bg-red-500 bg-green-500')
+             .addClass('bg-yellow-500');
+        ring.removeClass('bg-gray-400 bg-red-500 bg-green-500 animate-ping')
+            .addClass('bg-yellow-500');
+        text.text('Partial').removeClass('text-white text-opacity-70').addClass('text-white');
+        icon.removeClass('text-gray-400 text-red-400 text-green-400').addClass('text-yellow-300');
+        
+        // Update tooltip
+        tooltipMessage.text('⚠ Automation workflows online, AI API needs configuration');
+        tooltipIcon.removeClass('text-green-500 text-red-500 text-gray-500')
+                   .addClass('text-yellow-500');
+        tooltipN8n.text('Online ✓').removeClass('text-red-600 text-green-600 text-gray-600')
+                  .addClass('text-yellow-600');
+        tooltipAIAPI.text('Not configured')
+                    .removeClass('text-red-600 text-green-600 text-gray-600')
+                    .addClass('text-yellow-600');
+        
+    } else {
+        // RED - Manual Mode (n8n offline or not configured)
+        light.removeClass('bg-gray-400 bg-green-500 bg-yellow-500')
+             .addClass('bg-red-500');
+        ring.removeClass('bg-gray-400 bg-green-500 bg-yellow-500 animate-ping')
+            .addClass('bg-red-500');
+        text.text('Offline').removeClass('text-white text-opacity-70').addClass('text-white');
+        icon.removeClass('text-gray-400 text-yellow-300 text-green-400').addClass('text-red-400');
+        
+        // Update tooltip
+        tooltipMessage.text('✗ AI automation unavailable - Manual mode only');
+        tooltipIcon.removeClass('text-green-500 text-yellow-500 text-gray-500')
+                   .addClass('text-red-500');
+        tooltipN8n.text('Offline ✗').removeClass('text-green-600 text-yellow-600 text-gray-600')
+                  .addClass('text-red-600');
+        tooltipAIAPI.text('N/A')
+                    .removeClass('text-green-600 text-yellow-600 text-gray-600')
+                    .addClass('text-red-600');
+    }
 }

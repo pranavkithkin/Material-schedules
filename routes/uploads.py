@@ -323,8 +323,7 @@ def upload_delivery_document(delivery_id):
             file_size=file_size,
             file_type='pdf',
             mime_type='application/pdf',
-            entity_type='delivery',
-            entity_id=delivery_id,
+            delivery_id=delivery_id,  # Link directly to delivery
             processing_status='pending',
             uploaded_by=request.form.get('uploaded_by', 'Manual')
         )
@@ -338,23 +337,259 @@ def upload_delivery_document(delivery_id):
         
         db.session.commit()
         
-        # TODO: Trigger n8n workflow here
-        # This will be implemented in Phase 2 of Sprint 2
-        # n8n_webhook_url = 'https://your-n8n-instance.com/webhook/extract-delivery'
-        # requests.post(n8n_webhook_url, json={
-        #     'delivery_id': delivery_id,
-        #     'file_id': file_record.id,
-        #     'file_path': file_path,
-        #     'po_ref': delivery.purchase_order.po_ref if delivery.purchase_order else None
-        # })
+        # Trigger n8n workflow for document extraction (works for ALL document types)
+        try:
+            import requests
+            n8n_webhook_url = os.getenv('N8N_WEBHOOK_URL', 'https://n8n1.trart.uk')
+            n8n_api_key = os.getenv('N8N_API_KEY', '')
+            
+            # Build full file URL for n8n to download
+            file_url = f"http://localhost:5001/uploads/{filename}"
+            
+            # Generic webhook payload that works for ALL document types
+            webhook_payload = {
+                'file_id': file_record.id,
+                'file_url': file_url,
+                'file_path': file_record.file_path,
+                # Include all possible ID fields - n8n will use the right one
+                'delivery_id': delivery_id,
+                'po_id': delivery.po_id if delivery.purchase_order else None,
+                'po_ref': delivery.purchase_order.po_ref if delivery.purchase_order else None,
+                'document_context': 'delivery'  # Hint for n8n, but it will auto-detect
+            }
+            
+            # Trigger n8n document intelligence workflow (generic endpoint)
+            response = requests.post(
+                f"{n8n_webhook_url}/webhook/extract-document",  # Generic endpoint for all document types
+                json=webhook_payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {n8n_api_key}'
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ n8n document intelligence triggered for delivery {delivery_id}")
+            else:
+                print(f"⚠️ n8n workflow trigger failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Could not trigger n8n workflow: {str(e)}")
+            # Don't fail the upload if n8n is unavailable
         
         return jsonify({
             'success': True,
-            'message': 'Document uploaded successfully. Extraction will begin shortly.',
+            'message': 'Document uploaded successfully. AI extraction in progress...',
             'delivery_id': delivery_id,
             'file_id': file_record.id,
             'file_path': file_record.file_path,
-            'extraction_status': 'pending'
+            'extraction_status': 'pending',
+            'n8n_triggered': True
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@uploads_bp.route('/api/purchase-orders/<int:po_id>/upload-document', methods=['POST'])
+def upload_po_document(po_id):
+    """
+    Upload Purchase Order document and trigger n8n extraction workflow
+    """
+    try:
+        # Get the PO record
+        po = PurchaseOrder.query.get_or_404(po_id)
+        
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type (PDF only)
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Only PDF files are allowed'}), 400
+        
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"po_{po_id}_{timestamp}_{filename}"
+        
+        # Get organized upload path
+        upload_path, relative_path = get_upload_path()
+        file_path = os.path.join(upload_path, filename)
+        
+        # Save file
+        file.save(file_path)
+        file_size = os.path.getsize(file_path)
+        
+        # Create File record
+        file_record = File(
+            filename=filename,
+            original_filename=file.filename,
+            file_path=os.path.join(relative_path, filename),
+            file_size=file_size,
+            file_type='pdf',
+            mime_type='application/pdf',
+            purchase_order_id=po_id,  # Link directly to PO
+            processing_status='pending',
+            uploaded_by=request.form.get('uploaded_by', 'Manual')
+        )
+        
+        db.session.add(file_record)
+        db.session.commit()
+        
+        # Trigger n8n workflow
+        try:
+            import requests
+            n8n_webhook_url = os.getenv('N8N_WEBHOOK_URL', 'https://n8n1.trart.uk')
+            n8n_api_key = os.getenv('N8N_API_KEY', '')
+            
+            file_url = f"http://localhost:5001/uploads/{filename}"
+            
+            webhook_payload = {
+                'file_id': file_record.id,
+                'file_url': file_url,
+                'file_path': file_record.file_path,
+                'po_id': po_id,
+                'po_ref': po.po_ref,
+                'material_id': po.material_id,
+                'document_context': 'purchase_order'
+            }
+            
+            response = requests.post(
+                f"{n8n_webhook_url}/webhook/extract-document",
+                json=webhook_payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {n8n_api_key}'
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ n8n document intelligence triggered for PO {po_id}")
+            else:
+                print(f"⚠️ n8n workflow trigger failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Could not trigger n8n workflow: {str(e)}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'PO document uploaded. AI extraction in progress...',
+            'po_id': po_id,
+            'file_id': file_record.id,
+            'file_path': file_record.file_path,
+            'extraction_status': 'pending',
+            'n8n_triggered': True
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@uploads_bp.route('/api/payments/<int:payment_id>/upload-document', methods=['POST'])
+def upload_payment_document(payment_id):
+    """
+    Upload Invoice/Payment document and trigger n8n extraction workflow
+    """
+    try:
+        # Get the payment record
+        payment = Payment.query.get_or_404(payment_id)
+        
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type (PDF only)
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Only PDF files are allowed'}), 400
+        
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"invoice_{payment_id}_{timestamp}_{filename}"
+        
+        # Get organized upload path
+        upload_path, relative_path = get_upload_path()
+        file_path = os.path.join(upload_path, filename)
+        
+        # Save file
+        file.save(file_path)
+        file_size = os.path.getsize(file_path)
+        
+        # Create File record
+        file_record = File(
+            filename=filename,
+            original_filename=file.filename,
+            file_path=os.path.join(relative_path, filename),
+            file_size=file_size,
+            file_type='pdf',
+            mime_type='application/pdf',
+            payment_id=payment_id,  # Link directly to payment
+            processing_status='pending',
+            uploaded_by=request.form.get('uploaded_by', 'Manual')
+        )
+        
+        db.session.add(file_record)
+        db.session.commit()
+        
+        # Trigger n8n workflow
+        try:
+            import requests
+            n8n_webhook_url = os.getenv('N8N_WEBHOOK_URL', 'https://n8n1.trart.uk')
+            n8n_api_key = os.getenv('N8N_API_KEY', '')
+            
+            file_url = f"http://localhost:5001/uploads/{filename}"
+            
+            webhook_payload = {
+                'file_id': file_record.id,
+                'file_url': file_url,
+                'file_path': file_record.file_path,
+                'payment_id': payment_id,
+                'po_id': payment.po_id,
+                'po_ref': payment.purchase_order.po_ref if payment.purchase_order else None,
+                'document_context': 'invoice'
+            }
+            
+            response = requests.post(
+                f"{n8n_webhook_url}/webhook/extract-document",
+                json=webhook_payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {n8n_api_key}'
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ n8n document intelligence triggered for payment {payment_id}")
+            else:
+                print(f"⚠️ n8n workflow trigger failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Could not trigger n8n workflow: {str(e)}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Invoice uploaded. AI extraction in progress...',
+            'payment_id': payment_id,
+            'file_id': file_record.id,
+            'file_path': file_record.file_path,
+            'extraction_status': 'pending',
+            'n8n_triggered': True
         }), 201
         
     except Exception as e:
