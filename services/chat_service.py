@@ -1,16 +1,20 @@
 """
-Chat Service for natural language queries
-Processes user questions and returns relevant data
+Chat Service for natural language queries and conversational data entry
+Supports multi-turn conversations with context tracking
 """
 
 import json
+import re
+from datetime import datetime, timedelta
 from models import db
 from models.material import Material
 from models.purchase_order import PurchaseOrder
 from models.payment import Payment
 from models.delivery import Delivery
+from models.conversation import Conversation, ConversationMessage
 from config import Config
 from sqlalchemy import or_, and_
+import uuid
 
 # Import AI libraries conditionally
 try:
@@ -25,8 +29,405 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+
+class ConversationalChatService:
+    """Enhanced chat service with conversation tracking and data entry"""
+    
+    def __init__(self):
+        self.anthropic_client = None
+        self.openai_client = None
+        
+        # Initialize Claude if available
+        if ANTHROPIC_AVAILABLE and Config.ANTHROPIC_API_KEY:
+            try:
+                self.anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+            except Exception as e:
+                print(f"Warning: Could not initialize Anthropic client: {e}")
+        
+        # Initialize OpenAI if available
+        if OPENAI_AVAILABLE and Config.OPENAI_API_KEY:
+            try:
+                openai.api_key = Config.OPENAI_API_KEY
+                self.openai_client = openai
+            except Exception as e:
+                print(f"Warning: Could not initialize OpenAI client: {e}")
+    
+    def process_message(self, user_message, conversation_id=None, user_id=None):
+        """
+        Process a message with conversation context.
+        Supports both queries and data entry.
+        """
+        # Get or create conversation
+        if conversation_id:
+            conversation = Conversation.query.filter_by(conversation_id=conversation_id).first()
+            if not conversation:
+                conversation = self._create_conversation(user_id)
+        else:
+            conversation = self._create_conversation(user_id)
+        
+        # Add user message to conversation
+        conversation.add_message('user', user_message)
+        
+        # Determine intent if not set
+        if not conversation.intent:
+            conversation.intent = self._detect_intent(user_message)
+        
+        # Process based on intent
+        if conversation.intent and conversation.intent.startswith('add_'):
+            response = self._handle_data_entry(conversation, user_message)
+        else:
+            response = self._handle_query(conversation, user_message)
+        
+        # Add assistant response to conversation
+        conversation.add_message('assistant', response['answer'], extra_data=response.get('metadata', {}))
+        
+        # Save conversation
+        db.session.commit()
+        
+        # Include conversation context in response
+        response['conversation_id'] = conversation.conversation_id
+        response['intent'] = conversation.intent
+        response['context_data'] = conversation.context_data
+        
+        return response
+    
+    def _create_conversation(self, user_id=None):
+        """Create a new conversation"""
+        conversation = Conversation(
+            conversation_id=str(uuid.uuid4()),
+            user_id=user_id,
+            status='active'
+        )
+        db.session.add(conversation)
+        db.session.flush()
+        return conversation
+    
+    def _detect_intent(self, message):
+        """Detect user intent from message"""
+        message_lower = message.lower()
+        
+        # Data entry intents
+        if any(word in message_lower for word in ['add', 'create', 'new']):
+            if any(word in message_lower for word in ['po', 'purchase order', 'order']):
+                return 'add_po'
+            elif any(word in message_lower for word in ['payment', 'invoice']):
+                return 'add_payment'
+            elif any(word in message_lower for word in ['delivery', 'shipment']):
+                return 'add_delivery'
+            elif any(word in message_lower for word in ['material']):
+                return 'add_material'
+        
+        # Query intents
+        return 'query'
+    
+    def _handle_data_entry(self, conversation, user_message):
+        """Handle conversational data entry (e.g., adding PO)"""
+        intent = conversation.intent
+        context = conversation.context_data or {}
+        
+        # Extract entities from current message
+        entities = self._extract_entities(user_message)
+        
+        # Merge entities into context
+        for key, value in entities.items():
+            if value is not None:
+                context[key] = value
+        
+        conversation.context_data = context
+        
+        # Check what's still missing based on intent
+        if intent == 'add_po':
+            return self._handle_add_po(conversation, context, entities)
+        elif intent == 'add_payment':
+            return self._handle_add_payment(conversation, context, entities)
+        elif intent == 'add_delivery':
+            return self._handle_add_delivery(conversation, context, entities)
+        else:
+            return {
+                'answer': "I can help you add a Purchase Order, Payment, or Delivery. What would you like to create?",
+                'action': 'clarify_intent',
+                'metadata': {}
+            }
+    
+    def _handle_add_po(self, conversation, context, entities):
+        """Handle adding a Purchase Order conversationally"""
+        required_fields = {
+            'po_ref': 'PO number',
+            'supplier_name': 'supplier name',
+            'total_amount': 'total amount',
+            'material_id': 'material type'
+        }
+        
+        # Check what's missing
+        missing = [field for field in required_fields.keys() if field not in context or context[field] is None]
+        
+        if missing:
+            # Ask for the next missing field
+            next_field = missing[0]
+            field_name = required_fields[next_field]
+            
+            # Special handling for material_id
+            if next_field == 'material_id':
+                materials = Material.query.limit(10).all()
+                material_list = ', '.join([m.material_type for m in materials])
+                return {
+                    'answer': f"What type of material is this for? (e.g., {material_list})",
+                    'action': 'collect_field',
+                    'field': next_field,
+                    'metadata': {'missing_fields': missing}
+                }
+            
+            return {
+                'answer': f"Got it! What's the {field_name}?",
+                'action': 'collect_field',
+                'field': next_field,
+                'metadata': {'missing_fields': missing, 'collected': list(context.keys())}
+            }
+        
+        # All required fields collected - confirm before creating
+        if not context.get('confirmed'):
+            summary = f"""
+✅ Ready to create Purchase Order:
+- PO Number: {context['po_ref']}
+- Supplier: {context['supplier_name']}
+- Amount: {Config.CURRENCY} {context['total_amount']:,.2f}
+- Material: {self._get_material_name(context['material_id'])}
+{f"- Expected Delivery: {context.get('expected_delivery_date', 'Not specified')}" if context.get('expected_delivery_date') else ''}
+
+Type 'confirm' to create this PO, or 'cancel' to abort.
+"""
+            return {
+                'answer': summary,
+                'action': 'confirm',
+                'metadata': {'pending_po': context}
+            }
+        
+        # Create the PO
+        try:
+            po = self._create_purchase_order(context)
+            conversation.complete()
+            
+            return {
+                'answer': f"✅ Purchase Order {po.po_ref} created successfully! (ID: {po.id})",
+                'action': 'completed',
+                'data': po.to_dict(),
+                'metadata': {'po_id': po.id}
+            }
+        except Exception as e:
+            return {
+                'answer': f"❌ Error creating PO: {str(e)}. Please try again.",
+                'action': 'error',
+                'metadata': {'error': str(e)}
+            }
+    
+    def _handle_add_payment(self, conversation, context, entities):
+        """Handle adding payment conversationally"""
+        required_fields = {
+            'po_id': 'Purchase Order (PO number)',
+            'paid_amount': 'payment amount'
+        }
+        
+        missing = [field for field in required_fields.keys() if field not in context or context[field] is None]
+        
+        if missing:
+            next_field = missing[0]
+            field_name = required_fields[next_field]
+            
+            if next_field == 'po_id':
+                recent_pos = PurchaseOrder.query.order_by(PurchaseOrder.created_at.desc()).limit(5).all()
+                po_list = ', '.join([po.po_ref for po in recent_pos])
+                return {
+                    'answer': f"Which Purchase Order is this payment for? (Recent POs: {po_list})",
+                    'action': 'collect_field',
+                    'field': next_field,
+                    'metadata': {'missing_fields': missing}
+                }
+            
+            return {
+                'answer': f"What's the {field_name}?",
+                'action': 'collect_field',
+                'field': next_field,
+                'metadata': {'missing_fields': missing}
+            }
+        
+        # Confirm and create
+        if not context.get('confirmed'):
+            po = PurchaseOrder.query.get(context['po_id'])
+            summary = f"""
+✅ Ready to record payment:
+- PO: {po.po_ref if po else 'Unknown'}
+- Amount: {Config.CURRENCY} {context['paid_amount']:,.2f}
+- Payment Type: {context.get('payment_type', 'Advance')}
+
+Type 'confirm' to record this payment.
+"""
+            return {
+                'answer': summary,
+                'action': 'confirm',
+                'metadata': {'pending_payment': context}
+            }
+        
+        try:
+            payment = self._create_payment(context)
+            conversation.complete()
+            
+            return {
+                'answer': f"✅ Payment of {Config.CURRENCY} {payment.paid_amount:,.2f} recorded successfully!",
+                'action': 'completed',
+                'data': payment.to_dict(),
+                'metadata': {'payment_id': payment.id}
+            }
+        except Exception as e:
+            return {
+                'answer': f"❌ Error recording payment: {str(e)}",
+                'action': 'error',
+                'metadata': {'error': str(e)}
+            }
+    
+    def _handle_add_delivery(self, conversation, context, entities):
+        """Handle adding delivery conversationally"""
+        return {
+            'answer': "Delivery tracking is coming soon! For now, please use the web form to add deliveries.",
+            'action': 'not_implemented',
+            'metadata': {}
+        }
+    
+    def _extract_entities(self, message):
+        """Extract entities from message (amounts, dates, names, etc.)"""
+        entities = {}
+        message_lower = message.lower()
+        
+        # Extract amounts (with k/m suffixes) - improved patterns
+        amount_patterns = [
+            (r'(\d+(?:,\d{3})*)\s*(?:aed|usd|dollars?|dirhams?)', 1),  # Amount before currency
+            (r'(?:aed|usd)\s*(\d+(?:,\d{3})*)', 1),  # Amount after currency
+            (r'(\d+)k', 1000),  # 80k format
+            (r'(\d+)\s*(?:thousand)', 1000),  # 80 thousand
+        ]
+        
+        found_amounts = []
+        for pattern, multiplier in amount_patterns:
+            matches = re.finditer(pattern, message_lower)
+            for match in matches:
+                amount_str = match.group(1).replace(',', '')
+                amount = float(amount_str) * (multiplier if isinstance(multiplier, int) else 1)
+                found_amounts.append(amount)
+        
+        # Use the largest amount found (likely the total, not quantity)
+        if found_amounts:
+            entities['total_amount'] = max(found_amounts)
+            entities['paid_amount'] = max(found_amounts)
+        
+        # Extract PO number - improved pattern
+        po_patterns = [
+            r'po[-\s]?([a-z0-9-]+)',
+            r'purchase\s+order\s+([a-z0-9-]+)',
+        ]
+        
+        for pattern in po_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                po_ref = match.group(1).upper()
+                # Avoid extracting "FOR" from "material for X"
+                if len(po_ref) > 2 and po_ref not in ['FOR', 'FROM', 'THE']:
+                    entities['po_ref'] = po_ref
+                    break
+        
+        # Extract dates (simple patterns)
+        date_patterns = {
+            'tomorrow': datetime.now().date() + timedelta(days=1),
+            'next week': datetime.now().date() + timedelta(days=7),
+            'next monday': self._next_weekday(0),
+            'next friday': self._next_weekday(4),
+        }
+        
+        for phrase, date_value in date_patterns.items():
+            if phrase in message_lower:
+                entities['expected_delivery_date'] = date_value.isoformat()
+                break
+        
+        # Extract supplier name (if message contains "from X")
+        from_match = re.search(r'from\s+([a-z\s&]+?)(?:\s+suppliers?|,|$|\d)', message_lower, re.IGNORECASE)
+        if from_match:
+            entities['supplier_name'] = from_match.group(1).strip().title()
+        
+        # Extract material type
+        materials = Material.query.all()
+        for material in materials:
+            if material.material_type.lower() in message_lower:
+                entities['material_id'] = material.id
+                break
+        
+        # Check for confirmation keywords
+        if any(word in message_lower for word in ['confirm', 'yes', 'correct', 'create']):
+            entities['confirmed'] = True
+        elif any(word in message_lower for word in ['cancel', 'no', 'abort', 'stop']):
+            entities['cancelled'] = True
+        
+        return entities
+    
+    def _next_weekday(self, weekday):
+        """Get next occurrence of weekday (0=Monday, 6=Sunday)"""
+        today = datetime.now().date()
+        days_ahead = weekday - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        return today + timedelta(days=days_ahead)
+    
+    def _get_material_name(self, material_id):
+        """Get material name by ID"""
+        material = Material.query.get(material_id)
+        return material.material_type if material else 'Unknown'
+    
+    def _create_purchase_order(self, context):
+        """Create a PO from context data"""
+        po = PurchaseOrder(
+            po_ref=context['po_ref'],
+            supplier_name=context['supplier_name'],
+            total_amount=context['total_amount'],
+            material_id=context['material_id'],
+            po_date=datetime.now().date(),
+            expected_delivery_date=context.get('expected_delivery_date'),
+            supplier_contact=context.get('supplier_contact'),
+            supplier_email=context.get('supplier_email'),
+            currency=context.get('currency', Config.CURRENCY),
+            po_status='Released',
+            created_by='Chat'
+        )
+        db.session.add(po)
+        db.session.commit()
+        return po
+    
+    def _create_payment(self, context):
+        """Create a payment from context data"""
+        from models.payment import Payment
+        
+        payment = Payment(
+            po_id=context['po_id'],
+            paid_amount=context['paid_amount'],
+            total_amount=context.get('total_amount', context['paid_amount']),
+            payment_type=context.get('payment_type', 'Advance'),
+            payment_status='Partial',
+            payment_date=datetime.now().date(),
+            currency=context.get('currency', Config.CURRENCY),
+            created_by='Chat'
+        )
+        payment.calculate_percentage()
+        db.session.add(payment)
+        db.session.commit()
+        return payment
+    
+    def _handle_query(self, conversation, user_message):
+        """Handle query with conversation context"""
+        # Use the original ChatService query logic
+        chat_service = ChatService()
+        result = chat_service.process_query(user_message)
+        
+        return result
+
+
 class ChatService:
-    """Service for processing natural language queries"""
+    """Original chat service for queries (kept for backward compatibility)"""
     
     def __init__(self):
         self.anthropic_client = None
@@ -244,7 +645,7 @@ Response:"""
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-3-sonnet-20240229",
+                    model="claude-3-5-sonnet-20241022",  # Upgraded to Claude 3.5 Sonnet (latest)
                     max_tokens=1000,
                     messages=[{"role": "user", "content": prompt}]
                 )

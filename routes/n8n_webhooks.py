@@ -10,6 +10,7 @@ from models.ai_suggestion import AISuggestion
 from models.material import Material
 from models.purchase_order import PurchaseOrder
 from models.delivery import Delivery
+from models.payment import Payment
 from models.file import File
 from routes.auth import require_api_key
 from datetime import datetime
@@ -342,46 +343,11 @@ def health_check():
 
 
 @n8n_bp.route('/delivery-extraction', methods=['POST'])
-@require_api_key
+@require_api_key  
 def receive_delivery_extraction():
     """
     Sprint 2: Receive extracted delivery data from n8n + Claude API workflow.
-    
-    Expected JSON body:
-    {
-        "delivery_id": 1,
-        "file_id": 5,
-        "extraction_status": "completed",
-        "extraction_confidence": 92.5,
-        "extracted_data": {
-            "delivery_order_number": "DO-2025-001",
-            "delivery_date": "2025-01-15",
-            "items": [
-                {
-                    "item_description": "Shower Mixer - Model SM-500",
-                    "quantity": 20,
-                    "unit": "pcs",
-                    "delivered": true
-                },
-                {
-                    "item_description": "Basin Mixer - Model BM-300",
-                    "quantity": 15,
-                    "unit": "pcs",
-                    "delivered": true
-                }
-            ],
-            "total_items": 2,
-            "supplier": "ABC Sanitary Wares",
-            "notes": "All items inspected and accepted"
-        },
-        "error_message": null
-    }
-    
-    Returns:
-        200: Extraction data saved successfully
-        400: Invalid request data
-        404: Delivery not found
-        500: Server error
+    Enhanced with confidence-based validation - only auto-saves if confidence ≥ 90%
     """
     try:
         data = request.get_json()
@@ -399,51 +365,111 @@ def receive_delivery_extraction():
         # Get delivery record
         delivery = Delivery.query.get_or_404(data['delivery_id'])
         
-        # Update delivery with extraction results
+        # Get confidence score (default to 0 if not provided)
+        confidence_score = data.get('extraction_confidence', 0)
+        
+        # Update delivery extraction status
         delivery.extraction_status = data['extraction_status']
         delivery.extraction_date = datetime.utcnow()
         
         if 'extracted_data' in data and data['extracted_data']:
-            delivery.extracted_data = data['extracted_data']
+            extracted = data['extracted_data']
+            delivery.extracted_data = extracted
             
-            # Extract item count from data
-            if 'items' in data['extracted_data']:
-                delivery.extracted_item_count = len(data['extracted_data']['items'])
-            elif 'total_items' in data['extracted_data']:
-                delivery.extracted_item_count = data['extracted_data']['total_items']
-        
-        if 'extraction_confidence' in data:
-            delivery.extraction_confidence = data['extraction_confidence']
-        
-        # If extraction completed successfully, auto-calculate delivery percentage
-        if data['extraction_status'] == 'completed' and delivery.extracted_data:
-            items = delivery.extracted_data.get('items', [])
-            if items:
-                delivered_items = sum(1 for item in items if item.get('delivered', False))
-                total_items = len(items)
-                if total_items > 0:
-                    delivery.delivery_percentage = round((delivered_items / total_items) * 100, 2)
-                    
-                    # Auto-update status based on percentage
-                    if delivery.delivery_percentage == 100:
-                        delivery.delivery_status = 'Delivered'
-                    elif delivery.delivery_percentage > 0:
-                        delivery.delivery_status = 'Partial'
-        
-        delivery.updated_at = datetime.utcnow()
-        delivery.updated_by = 'AI'
+            # Check if confidence is HIGH (≥ 90%) - auto-apply
+            if confidence_score >= 90:
+                # HIGH CONFIDENCE - Auto-apply changes
+                
+                # Map extracted fields to delivery fields
+                if 'dn_number' in extracted:
+                    delivery.dn_ref = extracted['dn_number']
+                if 'supplier' in extracted:
+                    delivery.supplier = extracted['supplier']
+                if 'buyer' in extracted:
+                    delivery.buyer = extracted['buyer']
+                if 'delivery_date' in extracted:
+                    try:
+                        delivery.delivery_date = datetime.strptime(extracted['delivery_date'], '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+                if 'received_date' in extracted:
+                    try:
+                        delivery.received_date = datetime.strptime(extracted['received_date'], '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+                
+                delivery.extraction_confidence = confidence_score
+                delivery.updated_at = datetime.utcnow()
+                delivery.updated_by = 'AI (Auto)'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'action': 'auto_applied',
+                    'message': f'High confidence ({confidence_score}%) - Changes applied automatically',
+                    'delivery_id': delivery.id,
+                    'extraction_confidence': confidence_score
+                }), 200
+                
+            else:
+                # LOW CONFIDENCE (< 90%) - Create AI Suggestion for manual review
+                
+                suggestion = AISuggestion(
+                    target_table='deliveries',
+                    target_id=delivery.id,
+                    action_type='update',
+                    ai_model='Claude via n8n',
+                    confidence_score=confidence_score,
+                    extraction_source='document_upload',
+                    source_document_path=data.get('document_path'),
+                    ai_reasoning=f"Extracted from delivery note. Confidence: {confidence_score}%. Please review fields - values like '{extracted.get('buyer', 'N/A')}' may be incorrect."
+                )
+                
+                # Set suggested data using the proper method
+                suggestion.set_suggested_data({
+                    'dn_ref': extracted.get('dn_number'),
+                    'supplier': extracted.get('supplier'),
+                    'buyer': extracted.get('buyer'),
+                    'delivery_date': extracted.get('delivery_date'),
+                    'received_date': extracted.get('received_date'),
+                    'items': extracted.get('items', [])
+                })
+                
+                # Set current data for comparison
+                suggestion.set_current_data({
+                    'dn_ref': delivery.dn_ref,
+                    'supplier': delivery.supplier,
+                    'buyer': delivery.buyer,
+                    'delivery_date': str(delivery.delivery_date) if delivery.delivery_date else None,
+                    'received_date': str(delivery.received_date) if delivery.received_date else None
+                })
+                
+                db.session.add(suggestion)
+                
+                # Mark delivery as needing review
+                delivery.extraction_confidence = confidence_score
+                delivery.extraction_status = 'needs_review'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'action': 'suggestion_created',
+                    'message': f'Low confidence ({confidence_score}%) - Created AI suggestion for manual review',
+                    'delivery_id': delivery.id,
+                    'suggestion_id': suggestion.id,
+                    'extraction_confidence': confidence_score,
+                    'requires_review': True,
+                    'reason': 'Confidence below 90% threshold - please verify extracted values'
+                }), 200
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Extraction data saved successfully',
-            'delivery_id': delivery.id,
-            'extraction_status': delivery.extraction_status,
-            'extraction_confidence': delivery.extraction_confidence,
-            'extracted_item_count': delivery.extracted_item_count,
-            'delivery_percentage': delivery.delivery_percentage,
-            'delivery_status': delivery.delivery_status
+            'message': 'Extraction data received',
+            'delivery_id': delivery.id
         }), 200
         
     except Exception as e:
@@ -654,44 +680,8 @@ def extract_pdf_from_file_id(file_id):
 @require_api_key
 def receive_po_extraction():
     """
-    Receive extracted Purchase Order data from n8n + Claude API workflow.
-    
-    Expected JSON body:
-    {
-        "po_id": 1,
-        "file_id": 5,
-        "extraction_status": "completed",
-        "extraction_confidence": 88.5,
-        "extracted_data": {
-            "po_number": "SAB_6001_49-2025",
-            "po_date": "2025-10-01",
-            "expected_delivery_date": "2025-10-15",
-            "supplier_name": "ABC Suppliers LLC",
-            "supplier_contact": "+971-50-123-4567",
-            "supplier_email": "sales@abcsuppliers.ae",
-            "material_type": "Distribution Board (DB)",
-            "total_amount": 50000.00,
-            "currency": "AED",
-            "payment_terms": "Net 30 days",
-            "delivery_terms": "FOB Destination",
-            "items": [
-                {
-                    "description": "Main Distribution Board - 400A",
-                    "quantity": "2",
-                    "unit": "sets",
-                    "unit_price": 25000.00
-                }
-            ],
-            "notes": "Include installation manual"
-        },
-        "error_message": null
-    }
-    
-    Returns:
-        200: Extraction data saved successfully
-        400: Invalid request data
-        404: PO not found
-        500: Server error
+    Sprint 2: Receive extracted PO data from n8n + Claude API workflow.
+    Enhanced with confidence-based validation - only auto-saves if confidence ≥ 90%
     """
     try:
         data = request.get_json()
@@ -709,117 +699,210 @@ def receive_po_extraction():
         # Get PO record
         po = PurchaseOrder.query.get_or_404(data['po_id'])
         
-        # Update PO with extraction results
+        # Get confidence score (default to 0 if not provided)
+        confidence_score = data.get('extraction_confidence', 0)
+        
+        # Update PO extraction status
+        po.extraction_status = data['extraction_status']
+        po.extraction_date = datetime.utcnow()
+        
         if 'extracted_data' in data and data['extracted_data']:
             extracted = data['extracted_data']
+            po.extracted_data = extracted
             
-            # Update PO fields from extracted data
-            # ALWAYS update po_ref with extracted po_number (override existing)
-            if 'po_number' in extracted:
-                po.po_ref = extracted['po_number']  # Only update po_ref (po_number doesn't exist in schema)
-            
-            if 'po_date' in extracted:
-                try:
-                    po.po_date = datetime.fromisoformat(extracted['po_date'])
-                    po.issue_date = datetime.fromisoformat(extracted['po_date'])  # Update issue_date too
-                except:
-                    pass
-            
-            if 'expected_delivery_date' in extracted:
-                try:
-                    po.expected_delivery_date = datetime.fromisoformat(extracted['expected_delivery_date'])
-                except:
-                    pass
-            
-            if 'supplier_name' in extracted:
-                po.supplier_name = extracted['supplier_name']
-            
-            if 'supplier_contact' in extracted:
-                po.supplier_contact = extracted['supplier_contact']
-            
-            if 'supplier_email' in extracted:
-                po.supplier_email = extracted['supplier_email']
-            
-            if 'total_amount' in extracted:
-                po.total_amount = float(extracted['total_amount'])
-            
-            if 'currency' in extracted:
-                po.currency = extracted['currency']
-            
-            if 'payment_terms' in extracted:
-                po.payment_terms = extracted['payment_terms']
-            
-            if 'delivery_terms' in extracted:
-                po.delivery_terms = extracted['delivery_terms']
-            
-            if 'notes' in extracted:
-                po.notes = extracted['notes']
-        
-        po.updated_at = datetime.utcnow()
-        po.updated_by = 'AI'
+            # Check if confidence is HIGH (≥ 90%) - auto-apply
+            if confidence_score >= 90:
+                # HIGH CONFIDENCE - Auto-apply changes
+                
+                # Map extracted fields to PO fields
+                if 'po_number' in extracted:
+                    po.po_number = extracted['po_number']
+                if 'po_description' in extracted:
+                    po.description = extracted['po_description']
+                if 'supplier' in extracted:
+                    po.supplier = extracted['supplier']
+                if 'po_date' in extracted:
+                    try:
+                        po.po_date = datetime.strptime(extracted['po_date'], '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+                if 'delivery_date' in extracted:
+                    try:
+                        po.delivery_date = datetime.strptime(extracted['delivery_date'], '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+                if 'total_amount' in extracted:
+                    try:
+                        po.total_amount = float(extracted['total_amount'])
+                    except (ValueError, TypeError):
+                        pass
+                
+                po.extraction_confidence = confidence_score
+                po.updated_at = datetime.utcnow()
+                po.updated_by = 'AI (Auto)'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'action': 'auto_applied',
+                    'message': f'High confidence ({confidence_score}%) - Changes applied automatically',
+                    'po_id': po.id,
+                    'extraction_confidence': confidence_score
+                }), 200
+                
+            else:
+                # LOW CONFIDENCE (< 90%) - Create AI Suggestion for manual review
+                
+                suggestion = AISuggestion(
+                    target_table='purchase_orders',
+                    target_id=po.id,
+                    action_type='update',
+                    ai_model='Claude via n8n',
+                    confidence_score=confidence_score,
+                    extraction_source='document_upload',
+                    source_document_path=data.get('document_path'),
+                    ai_reasoning=f"Extracted from PO document. Confidence: {confidence_score}%. Please review fields - some values may need verification."
+                )
+                
+                # Set suggested data using the proper method
+                suggestion.set_suggested_data({
+                    'po_number': extracted.get('po_number'),
+                    'description': extracted.get('po_description'),
+                    'supplier': extracted.get('supplier'),
+                    'po_date': extracted.get('po_date'),
+                    'delivery_date': extracted.get('delivery_date'),
+                    'total_amount': extracted.get('total_amount'),
+                    'items': extracted.get('items', [])
+                })
+                
+                # Set current data for comparison
+                suggestion.set_current_data({
+                    'po_number': po.po_number,
+                    'description': po.description,
+                    'supplier': po.supplier,
+                    'po_date': str(po.po_date) if po.po_date else None,
+                    'delivery_date': str(po.delivery_date) if po.delivery_date else None,
+                    'total_amount': po.total_amount
+                })
+                
+                db.session.add(suggestion)
+                
+                # Mark PO as needing review
+                po.extraction_confidence = confidence_score
+                po.extraction_status = 'needs_review'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'action': 'suggestion_created',
+                    'message': f'Low confidence ({confidence_score}%) - Created AI suggestion for manual review',
+                    'po_id': po.id,
+                    'suggestion_id': suggestion.id,
+                    'extraction_confidence': confidence_score,
+                    'requires_review': True,
+                    'reason': 'Confidence below 90% threshold - please verify extracted values'
+                }), 200
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'PO extraction data saved successfully',
-            'po_id': po.id,
-            'po_ref': po.po_ref,
-            'extraction_confidence': data.get('extraction_confidence'),
-            'supplier_name': po.supplier_name,
-            'total_amount': po.total_amount
+            'message': 'Extraction data received',
+            'po_id': po.id
         }), 200
         
     except Exception as e:
         db.session.rollback()
         return jsonify({
-            'error': 'Failed to save PO extraction data',
+            'error': 'Failed to save extraction data',
             'message': str(e)
         }), 500
+
+
+def _map_material_type_to_id(material_type_str):
+    """
+    Map AI-detected material type string to database material ID.
+    Handles various naming formats and returns the best match.
+    
+    Args:
+        material_type_str: String from AI (e.g., "Distribution Board (DB)", "Sanitary Wares", "VRF")
+    
+    Returns:
+        int: Material ID or None if no match found
+    """
+    if not material_type_str:
+        return None
+    
+    # Normalize the string
+    material_lower = material_type_str.lower()
+    
+    # Material mapping dictionary (keyword -> material_type in database)
+    material_mappings = {
+        'db': 'DB',
+        'distribution board': 'DB',
+        'panel': 'DB',
+        'switchboard': 'DB',
+        'electrical panel': 'DB',
+        
+        'vrf': 'VRF',
+        'air conditioning': 'VRF',
+        'ac unit': 'VRF',
+        'hvac': 'VRF',
+        'cooling': 'VRF',
+        
+        'cable': 'Cables',
+        'wire': 'Cables',
+        'conductor': 'Cables',
+        
+        'sanitary': 'Sanitary Wares',
+        'bathroom': 'Sanitary Wares',
+        'bathtub': 'Sanitary Wares',
+        'shower': 'Sanitary Wares',
+        'basin': 'Sanitary Wares',
+        'toilet': 'Sanitary Wares',
+        'wc': 'Sanitary Wares',
+        'mixer': 'Sanitary Wares',
+        'tap': 'Sanitary Wares',
+        'faucet': 'Sanitary Wares',
+        
+        'fire': 'Fire Fighting',
+        'sprinkler': 'Fire Fighting',
+        'fire fighting': 'Fire Fighting',
+        
+        'plumbing': 'Plumbing',
+        'pipe': 'Plumbing',
+        'fitting': 'Plumbing',
+        'valve': 'Plumbing',
+        
+        'light': 'Lighting',
+        'lighting': 'Lighting',
+        'lamp': 'Lighting',
+        'led': 'Lighting',
+    }
+    
+    # Find matching material type
+    matched_material_type = None
+    for keyword, mat_type in material_mappings.items():
+        if keyword in material_lower:
+            matched_material_type = mat_type
+            break
+    
+    if not matched_material_type:
+        return None
+    
+    # Look up material in database
+    material = Material.query.filter_by(material_type=matched_material_type).first()
+    return material.id if material else None
 
 
 @n8n_bp.route('/invoice-extraction', methods=['POST'])
 @require_api_key
 def receive_invoice_extraction():
     """
-    Receive extracted Invoice/Payment data from n8n + Claude API workflow.
-    
-    Expected JSON body:
-    {
-        "payment_id": 1,
-        "file_id": 5,
-        "extraction_status": "completed",
-        "extraction_confidence": 91.0,
-        "extracted_data": {
-            "invoice_number": "INV-2025-001",
-            "invoice_date": "2025-10-05",
-            "due_date": "2025-11-04",
-            "po_reference": "SAB_6001_49-2025",
-            "supplier_name": "ABC Suppliers LLC",
-            "total_amount": 50000.00,
-            "paid_amount": 25000.00,
-            "payment_type": "Advance",
-            "currency": "AED",
-            "payment_terms": "50% Advance, 50% on Delivery",
-            "items": [
-                {
-                    "description": "Distribution Board",
-                    "quantity": "2",
-                    "unit_price": 25000.00,
-                    "amount": 50000.00
-                }
-            ],
-            "bank_details": "IBAN: AE123456789",
-            "notes": "Payment via bank transfer"
-        },
-        "error_message": null
-    }
-    
-    Returns:
-        200: Extraction data saved successfully
-        400: Invalid request data
-        404: Payment not found
-        500: Server error
+    Sprint 2: Receive extracted invoice data from n8n + Claude API workflow.
+    Enhanced with confidence-based validation - only auto-saves if confidence ≥ 90%
     """
     try:
         data = request.get_json()
@@ -834,70 +917,359 @@ def receive_invoice_extraction():
                 'missing_fields': missing_fields
             }), 400
         
-        # Get Payment record
-        from models.payment import Payment
+        # Get payment record
         payment = Payment.query.get_or_404(data['payment_id'])
         
-        # Update payment with extraction results
+        # Get confidence score (default to 0 if not provided)
+        confidence_score = data.get('extraction_confidence', 0)
+        
+        # Update payment extraction status
+        payment.extraction_status = data['extraction_status']
+        payment.extraction_date = datetime.utcnow()
+        
         if 'extracted_data' in data and data['extracted_data']:
             extracted = data['extracted_data']
+            payment.extracted_data = extracted
             
-            # Update payment fields from extracted data
-            if 'invoice_number' in extracted:
-                payment.invoice_ref = extracted['invoice_number']
-            
-            if 'invoice_date' in extracted:
-                try:
-                    payment.payment_date = datetime.fromisoformat(extracted['invoice_date'])
-                except:
-                    pass
-            
-            if 'total_amount' in extracted:
-                payment.total_amount = float(extracted['total_amount'])
-            
-            if 'paid_amount' in extracted:
-                payment.paid_amount = float(extracted['paid_amount'])
-            
-            if 'payment_type' in extracted:
-                payment.payment_type = extracted['payment_type']
-            
-            if 'currency' in extracted:
-                payment.currency = extracted['currency']
-            
-            if 'payment_terms' in extracted:
-                payment.payment_terms = extracted['payment_terms']
-            
-            if 'notes' in extracted:
-                payment.notes = extracted['notes']
-            
-            # Calculate payment percentage
-            payment.calculate_percentage()
-            
-            # Update payment status based on percentage
-            if payment.payment_percentage >= 100:
-                payment.payment_status = 'Full'
-            elif payment.payment_percentage > 0:
-                payment.payment_status = 'Partial'
-        
-        payment.updated_at = datetime.utcnow()
-        payment.updated_by = 'AI'
+            # Check if confidence is HIGH (≥ 90%) - auto-apply
+            if confidence_score >= 90:
+                # HIGH CONFIDENCE - Auto-apply changes
+                
+                # Map extracted fields to payment fields
+                if 'invoice_number' in extracted:
+                    payment.invoice_ref = extracted['invoice_number']
+                if 'supplier' in extracted:
+                    payment.supplier = extracted['supplier']
+                if 'invoice_date' in extracted:
+                    try:
+                        payment.invoice_date = datetime.strptime(extracted['invoice_date'], '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+                if 'due_date' in extracted:
+                    try:
+                        payment.due_date = datetime.strptime(extracted['due_date'], '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        pass
+                if 'total_amount' in extracted:
+                    try:
+                        payment.total_amount = float(extracted['total_amount'])
+                    except (ValueError, TypeError):
+                        pass
+                
+                payment.extraction_confidence = confidence_score
+                payment.updated_at = datetime.utcnow()
+                payment.updated_by = 'AI (Auto)'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'action': 'auto_applied',
+                    'message': f'High confidence ({confidence_score}%) - Changes applied automatically',
+                    'payment_id': payment.id,
+                    'extraction_confidence': confidence_score
+                }), 200
+                
+            else:
+                # LOW CONFIDENCE (< 90%) - Create AI Suggestion for manual review
+                
+                suggestion = AISuggestion(
+                    target_table='payments',
+                    target_id=payment.id,
+                    action_type='update',
+                    ai_model='Claude via n8n',
+                    confidence_score=confidence_score,
+                    extraction_source='document_upload',
+                    source_document_path=data.get('document_path'),
+                    ai_reasoning=f"Extracted from invoice. Confidence: {confidence_score}%. Please review fields - some values may need verification."
+                )
+                
+                # Set suggested data using the proper method
+                suggestion.set_suggested_data({
+                    'invoice_ref': extracted.get('invoice_number'),
+                    'supplier': extracted.get('supplier'),
+                    'invoice_date': extracted.get('invoice_date'),
+                    'due_date': extracted.get('due_date'),
+                    'total_amount': extracted.get('total_amount'),
+                    'items': extracted.get('items', [])
+                })
+                
+                # Set current data for comparison
+                suggestion.set_current_data({
+                    'invoice_ref': payment.invoice_ref,
+                    'supplier': payment.supplier,
+                    'invoice_date': str(payment.invoice_date) if payment.invoice_date else None,
+                    'due_date': str(payment.due_date) if payment.due_date else None,
+                    'total_amount': payment.total_amount
+                })
+                
+                db.session.add(suggestion)
+                
+                # Mark payment as needing review
+                payment.extraction_confidence = confidence_score
+                payment.extraction_status = 'needs_review'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'action': 'suggestion_created',
+                    'message': f'Low confidence ({confidence_score}%) - Created AI suggestion for manual review',
+                    'payment_id': payment.id,
+                    'suggestion_id': suggestion.id,
+                    'extraction_confidence': confidence_score,
+                    'requires_review': True,
+                    'reason': 'Confidence below 90% threshold - please verify extracted values'
+                }), 200
         
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Invoice extraction data saved successfully',
-            'payment_id': payment.id,
-            'invoice_ref': payment.invoice_ref,
-            'extraction_confidence': data.get('extraction_confidence'),
-            'total_amount': payment.total_amount,
-            'paid_amount': payment.paid_amount,
-            'payment_percentage': payment.payment_percentage
+            'message': 'Extraction data received',
+            'payment_id': payment.id
         }), 200
         
     except Exception as e:
         db.session.rollback()
         return jsonify({
-            'error': 'Failed to save invoice extraction data',
+            'error': 'Failed to save extraction data',
+            'message': str(e)
+        }), 500
+
+
+@n8n_bp.route('/pending-deliveries', methods=['GET'])
+@require_api_key
+def get_pending_deliveries():
+    """
+    Get upcoming deliveries for reminder notifications.
+    Used by n8n scheduled workflow (Daily 8 AM).
+    
+    Query Parameters:
+        days: Number of days ahead to check (default: 7)
+        status: Filter by delivery status (optional)
+    
+    Returns:
+        200: List of pending deliveries with material details
+    """
+    try:
+        days_ahead = request.args.get('days', 7, type=int)
+        status_filter = request.args.get('status', None)
+        
+        from datetime import timedelta
+        today = datetime.now().date()
+        future_date = today + timedelta(days=days_ahead)
+        
+        # Query deliveries with expected dates within range
+        query = Delivery.query.filter(
+            Delivery.expected_delivery_date.isnot(None),
+            Delivery.expected_delivery_date >= today,
+            Delivery.expected_delivery_date <= future_date
+        )
+        
+        # Filter by status if provided
+        if status_filter:
+            query = query.filter(Delivery.delivery_status == status_filter)
+        else:
+            # Exclude completed deliveries
+            query = query.filter(Delivery.delivery_status != 'Delivered')
+        
+        deliveries = query.order_by(Delivery.expected_delivery_date.asc()).all()
+        
+        # Build response with full details
+        result = []
+        for delivery in deliveries:
+            # Calculate days until delivery
+            days_until = (delivery.expected_delivery_date - today).days
+            
+            delivery_data = delivery.to_dict()
+            delivery_data['days_until_delivery'] = days_until
+            delivery_data['urgency'] = 'high' if days_until <= 2 else 'medium' if days_until <= 5 else 'low'
+            
+            # Add related PO and material details
+            if delivery.purchase_order:
+                po = delivery.purchase_order
+                delivery_data['po_details'] = {
+                    'po_ref': po.po_ref,
+                    'supplier_name': po.supplier_name,
+                    'supplier_contact': po.supplier_contact,
+                    'total_amount': po.total_amount,
+                    'currency': po.currency
+                }
+                
+                if po.material:
+                    delivery_data['material_details'] = {
+                        'material_type': po.material.material_type,
+                        'project_name': po.material.project_name
+                    }
+            
+            result.append(delivery_data)
+        
+        return jsonify({
+            'success': True,
+            'count': len(result),
+            'days_ahead': days_ahead,
+            'deliveries': result
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to fetch pending deliveries',
+            'message': str(e)
+        }), 500
+
+
+@n8n_bp.route('/weekly-report-data', methods=['GET'])
+@require_api_key
+def get_weekly_report_data():
+    """
+    Get comprehensive data for weekly report generation.
+    Used by n8n scheduled workflow (Friday 5 PM).
+    
+    Returns:
+        200: Summary statistics and lists for report
+    """
+    try:
+        from sqlalchemy import func
+        
+        # Materials summary
+        total_materials = Material.query.count()
+        materials_by_status = db.session.query(
+            Material.submittal_status,
+            func.count(Material.id)
+        ).group_by(Material.submittal_status).all()
+        
+        # Purchase Orders summary
+        total_pos = PurchaseOrder.query.count()
+        pos_by_status = db.session.query(
+            PurchaseOrder.po_status,
+            func.count(PurchaseOrder.id)
+        ).group_by(PurchaseOrder.po_status).all()
+        
+        # Payment summary
+        from models.payment import Payment
+        total_payments = Payment.query.count()
+        total_paid = db.session.query(func.sum(Payment.paid_amount)).scalar() or 0
+        total_amount = db.session.query(func.sum(Payment.total_amount)).scalar() or 0
+        payment_percentage = round((total_paid / total_amount * 100), 2) if total_amount > 0 else 0
+        
+        # Delivery summary
+        total_deliveries = Delivery.query.count()
+        deliveries_by_status = db.session.query(
+            Delivery.delivery_status,
+            func.count(Delivery.id)
+        ).group_by(Delivery.delivery_status).all()
+        
+        # Delayed deliveries (expected date passed but not delivered)
+        today = datetime.now().date()
+        delayed_deliveries = Delivery.query.filter(
+            Delivery.expected_delivery_date < today,
+            Delivery.delivery_status != 'Delivered'
+        ).all()
+        
+        # Upcoming deliveries (next 7 days)
+        from datetime import timedelta
+        next_week = today + timedelta(days=7)
+        upcoming_deliveries = Delivery.query.filter(
+            Delivery.expected_delivery_date >= today,
+            Delivery.expected_delivery_date <= next_week,
+            Delivery.delivery_status != 'Delivered'
+        ).order_by(Delivery.expected_delivery_date.asc()).all()
+        
+        # Pending POs (Not Released)
+        pending_pos = PurchaseOrder.query.filter_by(po_status='Not Released').all()
+        
+        # Recent activity (last 7 days)
+        last_week = today - timedelta(days=7)
+        recent_pos = PurchaseOrder.query.filter(
+            PurchaseOrder.created_at >= last_week
+        ).count()
+        
+        recent_deliveries = Delivery.query.filter(
+            Delivery.actual_delivery_date >= last_week
+        ).count()
+        
+        return jsonify({
+            'success': True,
+            'report_date': today.isoformat(),
+            'summary': {
+                'materials': {
+                    'total': total_materials,
+                    'by_status': dict(materials_by_status)
+                },
+                'purchase_orders': {
+                    'total': total_pos,
+                    'by_status': dict(pos_by_status),
+                    'pending_release': len(pending_pos)
+                },
+                'payments': {
+                    'total_payments': total_payments,
+                    'total_amount': total_amount,
+                    'total_paid': total_paid,
+                    'completion_percentage': payment_percentage
+                },
+                'deliveries': {
+                    'total': total_deliveries,
+                    'by_status': dict(deliveries_by_status),
+                    'delayed_count': len(delayed_deliveries),
+                    'upcoming_count': len(upcoming_deliveries)
+                },
+                'recent_activity': {
+                    'new_pos_last_week': recent_pos,
+                    'deliveries_last_week': recent_deliveries
+                }
+            },
+            'details': {
+                'delayed_deliveries': [d.to_dict() for d in delayed_deliveries],
+                'upcoming_deliveries': [d.to_dict() for d in upcoming_deliveries],
+                'pending_pos': [po.to_dict() for po in pending_pos]
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to generate weekly report data',
+            'message': str(e)
+        }), 500
+
+
+@n8n_bp.route('/log-notification', methods=['POST'])
+@require_api_key
+def log_notification():
+    """
+    Log notifications sent by n8n workflows.
+    Tracks delivery reminders, reports, and alerts.
+    
+    Expected JSON body:
+    {
+        "notification_type": "delivery_reminder",
+        "recipient": "email@example.com",
+        "subject": "Delivery Reminder",
+        "sent_at": "2025-10-06T08:00:00",
+        "status": "sent",
+        "related_entity_type": "delivery",
+        "related_entity_id": 1
+    }
+    
+    Returns:
+        200: Notification logged successfully
+    """
+    try:
+        data = request.get_json()
+        
+        # For now, just acknowledge - you can create a Notification model later
+        # to track all sent notifications in the database
+        
+        print(f"📧 Notification logged: {data.get('notification_type')} to {data.get('recipient')}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Notification logged successfully',
+            'notification_id': data.get('notification_type') + '_' + str(datetime.now().timestamp())
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'Failed to log notification',
             'message': str(e)
         }), 500

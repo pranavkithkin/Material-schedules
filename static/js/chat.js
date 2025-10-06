@@ -1,15 +1,14 @@
 // Chat Interface JavaScript
 
+// Global variable to store attached file
+let chatAttachedFile = null;
+
 $(document).ready(function() {
     const chatFloatBtn = $('#chat-float-btn');
     const chatModal = $('#chat-modal');
     const chatForm = $('#chat-form');
     const chatInput = $('#chat-input');
     const chatMessages = $('#chat-messages');
-    
-    // New simplified chat interface
-    const chatInterface = $('#chat-interface');
-    const chatToggleBtn = $('#chat-toggle-btn');
     
     // Toggle chat modal
     chatFloatBtn.on('click', function() {
@@ -20,6 +19,7 @@ $(document).ready(function() {
     // Close chat modal
     window.closeChatModal = function() {
         chatModal.addClass('hidden');
+        removeChatAttachment(); // Clear any attached files when closing
     };
     
     // Close on background click
@@ -34,33 +34,40 @@ $(document).ready(function() {
         e.preventDefault();
         
         const query = chatInput.val().trim();
-        if (!query) return;
         
-        // Add user message to chat
-        addMessage(query, 'user');
-        
-        // Clear input
-        chatInput.val('');
-        
-        // Show typing indicator
-        addTypingIndicator();
-        
-        // Send query to server
-        $.ajax({
-            url: '/api/chat',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ query: query }),
-            success: function(response) {
-                removeTypingIndicator();
-                addMessage(response.answer, 'ai', response.data);
-            },
-            error: function(err) {
-                removeTypingIndicator();
-                addMessage('Sorry, I encountered an error processing your request.', 'ai');
-                console.error('Chat error:', err);
-            }
-        });
+        // Check if there's a file attached
+        if (chatAttachedFile) {
+            handleDocumentUpload(query);
+        } else {
+            // Regular text query
+            if (!query) return;
+            
+            // Add user message to chat
+            addMessage(query, 'user');
+            
+            // Clear input
+            chatInput.val('');
+            
+            // Show typing indicator
+            addTypingIndicator();
+            
+            // Send query to server
+            $.ajax({
+                url: '/api/chat',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ query: query }),
+                success: function(response) {
+                    removeTypingIndicator();
+                    addMessage(response.answer, 'ai', response.data);
+                },
+                error: function(err) {
+                    removeTypingIndicator();
+                    addMessage('Sorry, I encountered an error processing your request.', 'ai');
+                    console.error('Chat error:', err);
+                }
+            });
+        }
     });
     
     // Handle suggested queries
@@ -68,6 +75,66 @@ $(document).ready(function() {
         chatInput.val(query);
         chatForm.submit();
     };
+    
+    function handleDocumentUpload(userMessage) {
+        const docType = $('#chat-doc-type').val();
+        const fileName = chatAttachedFile.name;
+        
+        // Display user message with document info
+        const messageText = userMessage || `Processing ${docType.replace('_', ' ')} document...`;
+        addDocumentMessage(fileName, messageText, 'user');
+        
+        // Clear input and attachment
+        chatInput.val('');
+        
+        // Show typing indicator
+        addTypingIndicator();
+        
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('file', chatAttachedFile);
+        formData.append('doc_type', docType);
+        formData.append('user_message', userMessage);
+        
+        // Upload file and process
+        $.ajax({
+            url: '/api/chat/upload',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                removeTypingIndicator();
+                
+                if (response.success) {
+                    // Show success message with extracted data
+                    const resultMessage = response.message || 'Document processed successfully!';
+                    addMessage(resultMessage, 'ai', response.data);
+                    
+                    // Show processing details
+                    if (response.details) {
+                        addMessage(response.details, 'ai');
+                    }
+                } else {
+                    addMessage(response.message || 'Failed to process document.', 'ai');
+                }
+                
+                // Clear attachment
+                removeChatAttachment();
+            },
+            error: function(err) {
+                removeTypingIndicator();
+                removeChatAttachment();
+                
+                let errorMsg = 'Sorry, I encountered an error processing your document.';
+                if (err.responseJSON && err.responseJSON.message) {
+                    errorMsg = err.responseJSON.message;
+                }
+                addMessage(errorMsg, 'ai');
+                console.error('Document upload error:', err);
+            }
+        });
+    }
     
     function addMessage(text, sender, data = null) {
         const isUser = sender === 'user';
@@ -101,6 +168,25 @@ $(document).ready(function() {
             `;
         }
         
+        chatMessages.append(messageHtml);
+        scrollToBottom();
+    }
+    
+    function addDocumentMessage(fileName, userMessage, sender) {
+        const messageHtml = `
+            <div class="flex items-start space-x-3 justify-end animate-fade-in">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-none p-4 shadow-sm max-w-[80%]">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <i class="fas fa-file-alt text-lg"></i>
+                        <p class="text-xs font-semibold">${escapeHtml(fileName)}</p>
+                    </div>
+                    <p class="text-sm">${escapeHtml(userMessage)}</p>
+                </div>
+                <div class="bg-gray-300 text-gray-600 p-2 rounded-full flex-shrink-0">
+                    <i class="fas fa-user"></i>
+                </div>
+            </div>
+        `;
         chatMessages.append(messageHtml);
         scrollToBottom();
     }
@@ -228,153 +314,71 @@ $(document).ready(function() {
     }
 });
 
-// Toggle simplified chat interface
-window.toggleChat = function() {
-    const chatInterface = $('#chat-interface');
-    const chatToggleBtn = $('#chat-toggle-btn');
+// File handling functions
+window.handleChatFileSelect = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
     
-    if (chatInterface.hasClass('hidden')) {
-        chatInterface.removeClass('hidden');
-        chatToggleBtn.find('i').removeClass('fa-comments').addClass('fa-times');
-        $('#chat-input').focus();
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+        alert('Please upload a PDF, PNG, or JPG file.');
+        return;
+    }
+    
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+        alert('File size must be less than 10MB.');
+        return;
+    }
+    
+    // Store the file
+    chatAttachedFile = file;
+    
+    // Show preview
+    showFilePreview(file);
+};
+
+function showFilePreview(file) {
+    const preview = $('#chat-file-preview');
+    const fileName = $('#preview-file-name');
+    const fileSize = $('#preview-file-size');
+    const fileIcon = $('#preview-file-icon');
+    
+    // Update file info
+    fileName.text(file.name);
+    fileSize.text(formatFileSize(file.size));
+    
+    // Update icon based on file type
+    if (file.type === 'application/pdf') {
+        fileIcon.removeClass().addClass('fas fa-file-pdf');
+    } else if (file.type.startsWith('image/')) {
+        fileIcon.removeClass().addClass('fas fa-file-image');
     } else {
-        chatInterface.addClass('hidden');
-        chatToggleBtn.find('i').removeClass('fa-times').addClass('fa-comments');
-    }
-};
-
-// Send chat message from simplified interface
-window.sendChatMessage = function() {
-    const input = $('#chat-interface #chat-input');
-    const query = input.val().trim();
-    
-    if (!query) return;
-    
-    // Add user message
-    addSimplifiedMessage(query, 'user');
-    input.val('');
-    
-    // Show typing
-    addSimplifiedTyping();
-    
-    // Send to server
-    $.ajax({
-        url: '/api/chat',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ query: query }),
-        success: function(response) {
-            removeSimplifiedTyping();
-            addSimplifiedMessage(response.answer, 'ai', response.data);
-        },
-        error: function(err) {
-            removeSimplifiedTyping();
-            addSimplifiedMessage('Sorry, I encountered an error.', 'ai');
-            console.error('Chat error:', err);
-        }
-    });
-};
-
-// Quick query helper
-window.quickQuery = function(query) {
-    $('#chat-interface #chat-input').val(query);
-    sendChatMessage();
-};
-
-// Add message to simplified interface
-function addSimplifiedMessage(text, sender, data = null) {
-    const chatMessages = $('#chat-interface #chat-messages');
-    const isUser = sender === 'user';
-    
-    let html = '';
-    if (isUser) {
-        html = `
-            <div class="flex items-start space-x-2 justify-end">
-                <div class="bg-gradient-to-r from-pkp-green to-pkp-gold text-white rounded-lg p-3 shadow-sm max-w-[280px]">
-                    <p class="text-sm">${escapeHtml(text)}</p>
-                </div>
-                <div class="bg-gray-300 text-gray-600 rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-user text-sm"></i>
-                </div>
-            </div>
-        `;
-    } else {
-        html = `
-            <div class="flex items-start space-x-2">
-                <div class="bg-pkp-green text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-robot text-sm"></i>
-                </div>
-                <div class="bg-white rounded-lg p-3 shadow-sm max-w-[280px]">
-                    <p class="text-sm text-gray-800">${escapeHtml(text)}</p>
-                    ${data ? formatSimplifiedData(data) : ''}
-                </div>
-            </div>
-        `;
+        fileIcon.removeClass().addClass('fas fa-file');
     }
     
-    chatMessages.append(html);
-    chatMessages.scrollTop(chatMessages[0].scrollHeight);
+    // Show preview
+    preview.removeClass('hidden');
+    
+    // Update placeholder text
+    $('#chat-input').attr('placeholder', 'Add a message about this document (optional)...');
 }
 
-function addSimplifiedTyping() {
-    const chatMessages = $('#chat-interface #chat-messages');
-    const indicator = `
-        <div id="simple-typing" class="flex items-start space-x-2">
-            <div class="bg-pkp-green text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-robot text-sm"></i>
-            </div>
-            <div class="bg-white rounded-lg p-3 shadow-sm">
-                <div class="flex space-x-1">
-                    <div class="w-2 h-2 bg-pkp-green rounded-full animate-bounce"></div>
-                    <div class="w-2 h-2 bg-pkp-green rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-2 h-2 bg-pkp-green rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                </div>
-            </div>
-        </div>
-    `;
-    chatMessages.append(indicator);
-    chatMessages.scrollTop(chatMessages[0].scrollHeight);
-}
+window.removeChatAttachment = function() {
+    chatAttachedFile = null;
+    $('#chat-file-preview').addClass('hidden');
+    $('#chat-file-input').val('');
+    $('#chat-input').attr('placeholder', 'Type your question or attach a document...');
+};
 
-function removeSimplifiedTyping() {
-    $('#simple-typing').remove();
-}
-
-function formatSimplifiedData(data) {
-    if (Array.isArray(data) && data.length > 0) {
-        let html = '<div class="mt-2 text-xs space-y-1">';
-        data.slice(0, 3).forEach(item => {
-            html += `<div class="bg-gray-50 p-2 rounded border border-gray-200">`;
-            for (const [key, value] of Object.entries(item)) {
-                html += `<div><span class="text-gray-600">${escapeHtml(key)}:</span> <span class="font-semibold">${escapeHtml(String(value))}</span></div>`;
-            }
-            html += '</div>';
-        });
-        if (data.length > 3) {
-            html += `<p class="text-gray-500 text-center">+${data.length - 3} more</p>`;
-        }
-        html += '</div>';
-        return html;
-    } else if (typeof data === 'object' && Object.keys(data).length > 0) {
-        let html = '<div class="mt-2 text-xs bg-gray-50 p-2 rounded border border-gray-200">';
-        for (const [key, value] of Object.entries(data)) {
-            html += `<div class="flex justify-between"><span class="text-gray-600">${escapeHtml(key)}:</span> <span class="font-semibold">${escapeHtml(String(value))}</span></div>`;
-        }
-        html += '</div>';
-        return html;
-    }
-    return '';
-}
-
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => map[m]);
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
 // Add fade-in animation CSS

@@ -1,0 +1,126 @@
+{
+  "name": "Weekly Report Generator (No Email)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * 5"
+            }
+          ]
+        }
+      },
+      "name": "Schedule - Friday 5 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FLASK_API_URL}}/api/n8n/weekly-report-data",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "Get Report Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300],
+      "typeVersion": 3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Flask API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format weekly report summary (no email, just console log)\nconst data = $input.item.json;\nconst summary = data.summary;\nconst details = data.details;\n\nconst subject = `📊 Weekly Material Delivery Report - ${data.report_date}`;\n\nconst textSummary = `\n${'='.repeat(60)}\nWEEKLY MATERIAL DELIVERY REPORT\n${data.report_date}\n${'='.repeat(60)}\n\nOVERVIEW:\n- Total Materials: ${summary.materials.total}\n- Purchase Orders: ${summary.purchase_orders.total}\n- Payment Completion: ${summary.payments.completion_percentage}%\n- Total Deliveries: ${summary.deliveries.total}\n\nALERTS:\n${summary.deliveries.delayed_count > 0 ? `🚨 ${summary.deliveries.delayed_count} Delayed Deliveries` : '✅ No delayed deliveries'}\n${summary.purchase_orders.pending_release > 0 ? `⚠️ ${summary.purchase_orders.pending_release} Pending PO Releases` : ''}\n\nUPCOMING DELIVERIES (Next 7 Days): ${details.upcoming_deliveries.length}\n${details.upcoming_deliveries.slice(0, 5).map(d => `  - ${d.expected_delivery_date}: ${d.po_ref || 'N/A'} (${d.delivery_status})`).join('\\n')}\n\nPAYMENT SUMMARY:\n- Total Amount: ${summary.payments.total_amount.toFixed(2)} AED\n- Total Paid: ${summary.payments.total_paid.toFixed(2)} AED\n- Outstanding: ${(summary.payments.total_amount - summary.payments.total_paid).toFixed(2)} AED\n- Completion: ${summary.payments.completion_percentage}%\n\nACTIVITY THIS WEEK:\n- New POs: ${summary.recent_activity.new_pos_last_week}\n- Deliveries Completed: ${summary.recent_activity.deliveries_last_week}\n\n${'='.repeat(60)}\n`;\n\n// Log to console\nconsole.log(textSummary);\n\nreturn {\n  subject,\n  summary_text: textSummary,\n  report_date: data.report_date,\n  delayed_count: summary.deliveries.delayed_count,\n  pending_pos: summary.purchase_orders.pending_release,\n  payment_completion: summary.payments.completion_percentage,\n  upcoming_deliveries: details.upcoming_deliveries.length\n};"
+      },
+      "name": "Format Report",
+      "type": "n8n-nodes-base.code",
+      "position": [650, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FLASK_API_URL}}/api/n8n/log-notification",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "notification_type",
+              "value": "weekly_report"
+            },
+            {
+              "name": "recipient",
+              "value": "console_log"
+            },
+            {
+              "name": "subject",
+              "value": "={{$json.subject}}"
+            },
+            {
+              "name": "sent_at",
+              "value": "={{$now.toISO()}}"
+            },
+            {
+              "name": "status",
+              "value": "logged"
+            }
+          ]
+        }
+      },
+      "name": "Log Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 300],
+      "typeVersion": 3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Flask API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - Friday 5 PM": {
+      "main": [
+        [
+          {
+            "node": "Get Report Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Report Data": {
+      "main": [
+        [
+          {
+            "node": "Format Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report": {
+      "main": [
+        [
+          {
+            "node": "Log Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

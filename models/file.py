@@ -36,7 +36,7 @@ class File(db.Model):
     
     # Relationships (back references)
     material = db.relationship('Material', backref='files')
-    purchase_order = db.relationship('PurchaseOrder', backref='files')
+    purchase_order = db.relationship('PurchaseOrder', backref='po_files', overlaps='files,po_parent')
     payment = db.relationship('Payment', backref='files')
     delivery = db.relationship('Delivery', backref='files')
     

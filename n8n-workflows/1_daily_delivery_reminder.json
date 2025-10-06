@@ -1,0 +1,197 @@
+{
+  "name": "Daily Delivery Reminder (No Email)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule - Daily 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FLASK_API_URL}}/api/n8n/pending-deliveries?days=7",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "Get Pending Deliveries",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300],
+      "typeVersion": 3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Flask API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.count}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Has Deliveries?",
+      "type": "n8n-nodes-base.if",
+      "position": [650, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "deliveries",
+        "options": {}
+      },
+      "name": "Split Deliveries",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [850, 200],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format delivery data for logging\nconst delivery = $input.item.json;\n\nconst urgencyEmoji = {\n  'high': '🚨',\n  'medium': '⚠️',\n  'low': '📅'\n};\n\nconst subject = `${urgencyEmoji[delivery.urgency]} Delivery Reminder: ${delivery.po_details?.po_ref || 'Delivery'} - ${delivery.days_until_delivery} days`;\n\nconst message = `Upcoming delivery for ${delivery.po_details?.po_ref || 'N/A'} - ${delivery.material_details?.material_type || 'N/A'} - Expected: ${delivery.expected_delivery_date} (${delivery.days_until_delivery} days)`;\n\n// Log to console for monitoring\nconsole.log(`📦 ${subject}`);\nconsole.log(`   ${message}`);\n\nreturn {\n  subject,\n  message,\n  delivery_id: delivery.id,\n  urgency: delivery.urgency,\n  po_ref: delivery.po_details?.po_ref || 'N/A',\n  material_type: delivery.material_details?.material_type || 'N/A',\n  expected_date: delivery.expected_delivery_date,\n  days_until: delivery.days_until_delivery\n};"
+      },
+      "name": "Format Delivery Info",
+      "type": "n8n-nodes-base.code",
+      "position": [1050, 200],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FLASK_API_URL}}/api/n8n/log-notification",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "notification_type",
+              "value": "delivery_reminder"
+            },
+            {
+              "name": "recipient",
+              "value": "console_log"
+            },
+            {
+              "name": "subject",
+              "value": "={{$json.subject}}"
+            },
+            {
+              "name": "sent_at",
+              "value": "={{$now.toISO()}}"
+            },
+            {
+              "name": "status",
+              "value": "logged"
+            },
+            {
+              "name": "related_entity_type",
+              "value": "delivery"
+            },
+            {
+              "name": "related_entity_id",
+              "value": "={{$json.delivery_id}}"
+            }
+          ]
+        }
+      },
+      "name": "Log to Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1250, 200],
+      "typeVersion": 3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Flask API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "name": "No Deliveries",
+      "type": "n8n-nodes-base.noOp",
+      "position": [850, 400],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Schedule - Daily 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Deliveries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Deliveries": {
+      "main": [
+        [
+          {
+            "node": "Has Deliveries?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Deliveries?": {
+      "main": [
+        [
+          {
+            "node": "Split Deliveries",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Deliveries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Deliveries": {
+      "main": [
+        [
+          {
+            "node": "Format Delivery Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Delivery Info": {
+      "main": [
+        [
+          {
+            "node": "Log to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

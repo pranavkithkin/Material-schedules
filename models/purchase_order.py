@@ -43,6 +43,7 @@ class PurchaseOrder(db.Model):
     # Relationships (material relationship is created by backref in Material model)
     payments = db.relationship('Payment', backref='purchase_order', lazy=True, cascade='all, delete-orphan')
     deliveries = db.relationship('Delivery', backref='purchase_order', lazy=True, cascade='all, delete-orphan')
+    files = db.relationship('File', backref='po_parent', lazy=True, cascade='all, delete-orphan', foreign_keys='File.purchase_order_id')
     
     def to_dict(self):
         """Convert model to dictionary"""

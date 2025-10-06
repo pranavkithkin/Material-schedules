@@ -595,3 +595,127 @@ def upload_payment_document(payment_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@uploads_bp.route('/api/upload-new-po', methods=['POST'])
+def upload_new_po():
+    """
+    Upload a NEW Purchase Order document and auto-create PO record
+    This endpoint:
+    1. Accepts LPO/PO PDF upload
+    2. Creates a new blank Purchase Order record
+    3. Links the file to the new PO
+    4. Triggers n8n to extract data and populate the PO
+    """
+    try:
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type (PDF only)
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Only PDF files are allowed for Purchase Orders'}), 400
+        
+        # Get material_id (optional - can be updated by AI later)
+        material_id = request.form.get('material_id', 1)  # Default to material ID 1
+        
+        # Create a NEW blank Purchase Order first
+        new_po = PurchaseOrder(
+            material_id=material_id,
+            po_ref=f"AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}",  # Temporary ref, will be updated by AI
+            supplier_name="Pending AI Extraction",  # Will be updated by AI
+            total_amount=0,  # Will be updated by AI
+            currency="AED",
+            po_status="Draft",
+            created_by="Upload",
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(new_po)
+        db.session.flush()  # Get the PO ID without committing
+        
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"po_{new_po.id}_{timestamp}_{filename}"
+        
+        # Get organized upload path
+        upload_path, relative_path = get_upload_path()
+        file_path = os.path.join(upload_path, filename)
+        
+        # Save file
+        file.save(file_path)
+        file_size = os.path.getsize(file_path)
+        
+        # Create File record linked to new PO
+        file_record = File(
+            filename=filename,
+            original_filename=file.filename,
+            file_path=os.path.join(relative_path, filename),
+            file_size=file_size,
+            file_type='pdf',
+            mime_type='application/pdf',
+            purchase_order_id=new_po.id,  # Link to new PO
+            processing_status='pending',
+            uploaded_by=request.form.get('uploaded_by', 'Manual Upload')
+        )
+        
+        db.session.add(file_record)
+        db.session.commit()
+        
+        # Trigger n8n workflow to extract data and populate the PO
+        try:
+            import requests
+            n8n_webhook_url = os.getenv('N8N_WEBHOOK_URL', 'https://n8n1.trart.uk')
+            n8n_api_key = os.getenv('N8N_API_KEY', '')
+            
+            file_url = f"http://localhost:5001/uploads/{filename}"
+            
+            webhook_payload = {
+                'file_id': file_record.id,
+                'file_url': file_url,
+                'file_path': file_record.file_path,
+                'po_id': new_po.id,
+                'po_ref': new_po.po_ref,
+                'material_id': material_id,
+                'document_context': 'purchase_order',
+                'auto_created': True  # Flag to indicate this was auto-created
+            }
+            
+            response = requests.post(
+                f"{n8n_webhook_url}/webhook/extract-document",
+                json=webhook_payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {n8n_api_key}'
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ n8n document intelligence triggered for new PO {new_po.id}")
+            else:
+                print(f"⚠️ n8n workflow trigger failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Could not trigger n8n workflow: {str(e)}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'New Purchase Order created! AI is extracting data from your document...',
+            'po_id': new_po.id,
+            'po_ref': new_po.po_ref,
+            'file_id': file_record.id,
+            'file_path': file_record.file_path,
+            'extraction_status': 'pending',
+            'n8n_triggered': True
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

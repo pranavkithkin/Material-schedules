@@ -45,7 +45,138 @@ Output Format:
   "reasoning": "All key information was clearly stated in the email/document"
 }
 
-Text to Extract From:
-{TEXT}
+Analyze this document and extract structured data.
 
-Return only the JSON object, no additional text.
+STEP 1: Identify the document type:
+- "purchase_order" - Purchase Order/LPO documents (look for PO numbers, LPO references, purchase orders)
+- "delivery_note" - Delivery Note/Delivery Order documents (look for delivery dates, tracking numbers, received by)
+- "invoice" - Invoice/Payment documents (look for invoice numbers, payment due dates, amounts paid)
+- "material_submittal" - Material Submittal documents (look for submittal numbers, approval status)
+
+STEP 2: Extract ALL relevant fields based on document type.
+
+═══════════════════════════════════════════════════════════════
+MATERIAL TYPE DETECTION GUIDE:
+═══════════════════════════════════════════════════════════════
+
+Analyze the items/descriptions in the document and match to these categories:
+
+**DB (Distribution Board)** - Keywords: "Distribution Board", "DB", "Panel", "Main Board", "Sub-distribution", "MCB", "MCCB", "Circuit Breaker", "Electrical Panel", "Switchboard"
+
+**VRF (Variable Refrigerant Flow)** - Keywords: "VRF", "Air Conditioning", "AC Unit", "Refrigerant", "Indoor Unit", "Outdoor Unit", "Cooling", "HVAC", "Ducted Unit", "Cassette"
+
+**Cables** - Keywords: "Cable", "Wire", "Conductor", "Power Cable", "Armoured Cable", "Control Cable", "NYY", "NYM", "mm²", "Electrical Cable"
+
+**Sanitary Wares** - Keywords: "Sanitary", "WC", "Basin", "Sink", "Toilet", "Bathtub", "Shower", "Mixer", "Tap", "Faucet", "Urinal", "Water Closet"
+
+**Fire Fighting** - Keywords: "Fire", "Sprinkler", "Hydrant", "Fire Alarm", "Smoke Detector", "Fire Extinguisher", "Fire Pump", "Hose Reel"
+
+**Plumbing** - Keywords: "Pipe", "Fitting", "Valve", "PPR", "UPVC", "Water Supply", "Drainage", "Sewage"
+
+**Lighting** - Keywords: "Light", "Lamp", "LED", "Fixture", "Downlight", "Spotlight", "Emergency Light"
+
+If multiple categories match, choose the PRIMARY category based on the majority of items or the most expensive item.
+
+═══════════════════════════════════════════════════════════════
+FOR PURCHASE ORDERS/LPOs - Return this exact JSON structure:
+═══════════════════════════════════════════════════════════════
+
+{
+  "document_type": "purchase_order",
+  "po_number": "Extract PO/LPO reference from TOP of document (e.g., PKP-LPO-6001-2025-50-R1)",
+  "po_date": "Issue date in YYYY-MM-DD format",
+  "expected_delivery_date": "Expected/promised delivery date in YYYY-MM-DD format",
+  "supplier_name": "Full supplier company name (include M/s if present)",
+  "supplier_contact": "Phone number",
+  "supplier_email": "Email address",
+  "material_type": "USE THE MATERIAL TYPE DETECTION GUIDE ABOVE. Analyze all items and return the PRIMARY category (DB/VRF/Cables/Sanitary Wares/Fire Fighting/Plumbing/Lighting). If none match, return 'Other'",
+  "total_amount": 10500.50,
+  "currency": "AED",
+  "payment_terms": "Payment terms (e.g., 50% Advance, 50% Before Delivery)",
+  "delivery_terms": "Delivery terms and conditions",
+  "items": [
+    {
+      "description": "Exact item description from document",
+      "quantity": "2",
+      "unit": "pcs/each/lot/m/etc",
+      "unit_price": 5250.25
+    }
+  ],
+  "notes": "Additional notes, project name, TRN, contact person, site location"
+}
+
+═══════════════════════════════════════════════════════════════
+FOR DELIVERY NOTES/ORDERS - Return this exact JSON structure:
+═══════════════════════════════════════════════════════════════
+
+{
+  "document_type": "delivery_note",
+  "po_number": "Related PO/LPO reference number (CRITICAL: Extract this carefully as it links to existing PO)",
+  "delivery_date": "Actual delivery date in YYYY-MM-DD format",
+  "delivery_location": "Full delivery address",
+  "tracking_number": "Tracking/waybill/shipment number",
+  "carrier": "Transport/logistics company name",
+  "received_by": "Name of person who received the delivery",
+  "supplier_name": "Supplier company name",
+  "material_type": "USE THE MATERIAL TYPE DETECTION GUIDE ABOVE. Analyze delivered items and return category. If PO number is found, the system will auto-match from existing PO.",
+  "items": [
+    {
+      "description": "Item description",
+      "quantity": "5",
+      "unit": "pcs",
+      "delivered": true
+    }
+  ],
+  "notes": "Special delivery notes, conditions, damages"
+}
+
+═══════════════════════════════════════════════════════════════
+FOR INVOICES - Return this exact JSON structure:
+═══════════════════════════════════════════════════════════════
+
+{
+  "document_type": "invoice",
+  "invoice_number": "Invoice reference number",
+  "invoice_date": "Invoice issue date in YYYY-MM-DD format",
+  "due_date": "Payment due date in YYYY-MM-DD format",
+  "po_reference": "Related PO/LPO number (CRITICAL: Extract this to link with existing PO)",
+  "supplier_name": "Supplier company name",
+  "total_amount": 50000.00,
+  "paid_amount": 25000.00,
+  "payment_type": "Advance/Partial/Full/Balance",
+  "currency": "AED",
+  "payment_terms": "Payment terms and conditions",
+  "material_type": "USE THE MATERIAL TYPE DETECTION GUIDE ABOVE. Analyze invoice items. If PO reference found, system will auto-match from existing PO.",
+  "items": [
+    {
+      "description": "Item description",
+      "quantity": "2",
+      "unit_price": 25000.00,
+      "amount": 50000.00
+    }
+  ],
+  "notes": "Payment notes, bank details, TRN"
+}
+
+═══════════════════════════════════════════════════════════════
+DOCUMENT TEXT TO ANALYZE:
+═══════════════════════════════════════════════════════════════
+
+{{ $json.text }}
+
+═══════════════════════════════════════════════════════════════
+EXTRACTION RULES (CRITICAL):
+═══════════════════════════════════════════════════════════════
+
+1. Return ONLY the JSON object - no markdown, no code blocks, no explanations, no ```json``` tags
+2. Use actual values from the document text above - never use placeholder text like "Item description" or "Supplier name"
+3. If a field cannot be found in the document, use null (not empty string, not placeholder)
+4. All monetary amounts must be numbers: 10500.50 (not strings: "10500.50")
+5. All dates must be in YYYY-MM-DD format (convert from any format in the document)
+6. The JSON must be valid and parseable (no trailing commas, proper escaping)
+7. For PKP documents: PO number is usually the FIRST LINE (e.g., PKP-LPO-6001-2025-50-R1)
+8. Extract ALL items from the document into the items array
+9. Include VAT/tax information in notes if present
+10. Capture project names, site locations, contact persons in notes field
+11. **MATERIAL TYPE**: Carefully analyze ALL item descriptions and match against the Material Type Detection Guide. Choose the category that best represents the majority of items.
+12. **PO LINKING**: For Delivery Notes and Invoices, the PO number/reference is CRITICAL for linking to existing records. Extract it carefully.
