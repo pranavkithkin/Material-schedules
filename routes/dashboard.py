@@ -192,18 +192,24 @@ def n8n_status():
     
     try:
         # Check if n8n URL is configured
-        n8n_url = os.getenv('N8N_WEBHOOK_URL', '')
+        n8n_base_url = os.getenv('N8N_BASE_URL', '')
         
-        if not n8n_url:
-            status['details']['message'] = 'n8n URL not configured'
-            return jsonify(status)
+        if not n8n_base_url:
+            # Fallback to webhook URL base
+            webhook_url = os.getenv('N8N_WEBHOOK_URL', '')
+            if webhook_url:
+                # Extract base URL from webhook URL (remove /webhook path)
+                n8n_base_url = webhook_url.replace('/webhook', '')
+            else:
+                status['details']['message'] = 'n8n URL not configured'
+                return jsonify(status)
         
-        status['details']['n8n_url'] = n8n_url
+        status['details']['n8n_url'] = n8n_base_url
         
         # Try to ping n8n health endpoint (with timeout)
         try:
             response = requests.get(
-                f"{n8n_url}/healthz",
+                f"{n8n_base_url}/healthz",
                 timeout=5,  # 5 second timeout
                 verify=True  # Verify SSL certificates
             )

@@ -69,6 +69,7 @@ class Payment(db.Model):
             'payment_method': self.payment_method,
             'currency': self.currency,
             'payment_status': self.payment_status,
+            'payment_terms': self.payment_terms,
             'notes': self.notes,
             'invoice_path': self.invoice_path,
             'receipt_path': self.receipt_path,

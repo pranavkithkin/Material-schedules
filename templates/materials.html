@@ -294,8 +294,13 @@ async function validateAndSave() {
         material_id: id || null,
         material_type: $('#material-type').val(),
         description: $('#description').val(),
-        date_submitted: $('#approval-date').val(),
-        status: $('#approval-status').val()
+        approval_status: $('#approval-status').val(),
+        approval_date: $('#approval-date').val(),
+        revision_number: $('#revision-number').val(),
+        previous_submittal_id: $('#previous-submittal-id').val() || null,
+        submittal_ref: $('#submittal-ref').val(),
+        specification_ref: $('#specification-ref').val(),
+        approval_notes: $('#approval-notes').val()
     };
     
     // Show validating message
@@ -323,9 +328,24 @@ async function validateAndSave() {
         });
         
         const result = await response.json();
+        
+        // Check if API returned an error
+        if (!response.ok || !result.success) {
+            $('#validation-results').removeClass('hidden').html(`
+                <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                        <span class="text-red-700 text-sm">Validation error: ${result.message || result.error || 'Unknown error'}</span>
+                    </div>
+                </div>
+            `);
+            return;
+        }
+        
         displayValidationResults(result, isEdit);
         
     } catch (error) {
+        console.error('Validation error:', error);
         $('#validation-results').removeClass('hidden').html(`
             <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
                 <div class="flex items-center">
@@ -341,9 +361,9 @@ function displayValidationResults(result, isEdit) {
     const resultsDiv = $('#validation-results');
     let html = '';
     
-    const perfBadge = `<span class="text-xs text-gray-500 ml-2">⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage} tokens</span>`;
+    const perfBadge = result.processing_time_ms ? `<span class="text-xs text-gray-500 ml-2">⚡ ${result.processing_time_ms}ms | 💰 ${result.token_usage || 0} tokens</span>` : '';
     
-    if (result.is_valid && result.duplicates.length === 0) {
+    if (result.is_valid && (!result.duplicates || result.duplicates.length === 0)) {
         html = `
             <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
                 <div class="flex items-center justify-between">

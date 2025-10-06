@@ -37,8 +37,9 @@ def create_material():
             approval_notes=data.get('approval_notes'),
             submittal_ref=data.get('submittal_ref'),
             specification_ref=data.get('specification_ref'),
-            quantity=data.get('quantity'),
-            unit=data.get('unit'),
+            revision_number=data.get('revision_number', 0),
+            previous_submittal_id=data.get('previous_submittal_id'),
+            document_path=data.get('document_path'),
             created_by=data.get('created_by', 'Manual')
         )
         
@@ -76,10 +77,12 @@ def update_material(id):
             material.submittal_ref = data['submittal_ref']
         if 'specification_ref' in data:
             material.specification_ref = data['specification_ref']
-        if 'quantity' in data:
-            material.quantity = data['quantity']
-        if 'unit' in data:
-            material.unit = data['unit']
+        if 'revision_number' in data:
+            material.revision_number = data['revision_number']
+        if 'previous_submittal_id' in data:
+            material.previous_submittal_id = data['previous_submittal_id']
+        if 'document_path' in data:
+            material.document_path = data['document_path']
         if 'approval_date' in data:
             material.approval_date = datetime.fromisoformat(data['approval_date']) if data['approval_date'] else None
         

@@ -49,7 +49,7 @@ class PurchaseOrder(db.Model):
         return {
             'id': self.id,
             'material_id': self.material_id,
-            'material': {'material_type': self.material.material_type} if self.material else None,
+            'material': {'id': self.material.id, 'material_type': self.material.material_type} if self.material else None,
             'quote_ref': self.quote_ref,
             'po_ref': self.po_ref,
             'po_number': self.po_ref,  # Alias for template compatibility

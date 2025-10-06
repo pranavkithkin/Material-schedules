@@ -165,27 +165,41 @@ class DataProcessingAgent:
     
     def _validate_submittal(self, data: Dict[str, Any]) -> Tuple[bool, List[str], List[str]]:
         """Validate Material Submittal data"""
-        # Mandatory fields
-        self._check_mandatory_fields(data, [
-            'material_id', 'date_submitted', 'status'
-        ])
+        # Mandatory fields - material_type is required for new materials
+        required_fields = ['material_type', 'approval_status']
+        self._check_mandatory_fields(data, required_fields)
         
         # Format validation
-        self._validate_date(data.get('date_submitted'), 'Submission Date')
-        self._validate_status(data.get('status'), [
+        self._validate_status(data.get('approval_status'), [
             'Pending', 'Under Review', 'Approved', 'Approved as Noted', 'Revise & Resubmit'
         ])
         
-        # Cross-reference validation
-        if data.get('date_submitted') and data.get('response_date'):
-            self._validate_response_after_submission(
-                data['date_submitted'], 
-                data['response_date']
-            )
+        # Validate approval_date if provided
+        if data.get('approval_date'):
+            self._validate_date(data.get('approval_date'), 'Approval Date')
         
-        # Check if response overdue
-        if data.get('status') == 'Pending' and data.get('date_submitted'):
-            self._check_submittal_response_overdue(data['date_submitted'])
+        # Validate revision_number if provided
+        if 'revision_number' in data:
+            try:
+                rev_num = int(data['revision_number'])
+                if rev_num < 0:
+                    self.validation_errors.append(
+                        "❌ Revision number cannot be negative"
+                    )
+            except (ValueError, TypeError):
+                self.validation_errors.append(
+                    "❌ Revision number must be a valid number"
+                )
+        
+        # Check if previous_submittal_id exists when revision > 0
+        try:
+            rev_num = int(data.get('revision_number', 0))
+            if rev_num > 0 and not data.get('previous_submittal_id'):
+                self.validation_warnings.append(
+                    "⚠️ Consider linking to previous submittal for revisions"
+                )
+        except (ValueError, TypeError):
+            pass  # Already handled above
         
         is_valid = len(self.validation_errors) == 0
         return is_valid, self.validation_errors, self.validation_warnings
