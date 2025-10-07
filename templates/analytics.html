@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - Material Delivery{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    .loading-spinner {
+        border: 3px solid #f3f4f6;
+        border-top: 3px solid #006837;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .risk-badge-high {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    .risk-badge-medium {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    .risk-badge-low {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                <i class="fas fa-chart-line text-pkp-green mr-3"></i>
+                Analytics Dashboard
+            </h1>
+            <p class="text-gray-600 mt-2">Comprehensive business intelligence and predictive insights</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <select id="dateRangeFilter" class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pkp-green">
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+                <option value="180" selected>Last 180 Days</option>
+                <option value="365">Last Year</option>
+            </select>
+            <button onclick="refreshDashboard()" class="bg-pkp-green text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition flex items-center space-x-2">
+                <i class="fas fa-sync-alt"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading State -->
+<div id="loadingState" class="flex items-center justify-center py-20">
+    <div class="text-center">
+        <div class="loading-spinner mx-auto mb-4"></div>
+        <p class="text-gray-600">Loading analytics data...</p>
+    </div>
+</div>
+
+<!-- Dashboard Content (Hidden Initially) -->
+<div id="dashboardContent" class="hidden">
+    <!-- Executive Summary KPIs -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Value -->
+        <div class="stat-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                    <i class="fas fa-dollar-sign text-2xl"></i>
+                </div>
+                <span class="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">Total Value</span>
+            </div>
+            <h3 class="text-3xl font-bold mb-1" id="totalValue">0</h3>
+            <p class="text-blue-100 text-sm">AED</p>
+        </div>
+
+        <!-- Active POs -->
+        <div class="stat-card bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                    <i class="fas fa-file-invoice text-2xl"></i>
+                </div>
+                <span class="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">Active</span>
+            </div>
+            <h3 class="text-3xl font-bold mb-1" id="activePOs">0</h3>
+            <p class="text-green-100 text-sm">Purchase Orders</p>
+        </div>
+
+        <!-- Pending Deliveries -->
+        <div class="stat-card bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                    <i class="fas fa-truck text-2xl"></i>
+                </div>
+                <span class="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">Pending</span>
+            </div>
+            <h3 class="text-3xl font-bold mb-1" id="pendingDeliveries">0</h3>
+            <p class="text-orange-100 text-sm">Deliveries</p>
+        </div>
+
+        <!-- High Risk Items -->
+        <div class="stat-card bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                    <i class="fas fa-exclamation-triangle text-2xl"></i>
+                </div>
+                <span class="text-sm font-medium bg-white bg-opacity-20 px-3 py-1 rounded-full">High Risk</span>
+            </div>
+            <h3 class="text-3xl font-bold mb-1" id="highRiskItems">0</h3>
+            <p class="text-red-100 text-sm">Items</p>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Supplier Performance Chart -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-users text-pkp-green mr-2"></i>
+                Top Suppliers Performance
+            </h3>
+            <div class="chart-container">
+                <canvas id="supplierChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Delivery Trends Chart -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-chart-area text-blue-500 mr-2"></i>
+                Delivery Trends
+            </h3>
+            <div class="chart-container">
+                <canvas id="deliveryTrendsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Payment Trends Chart -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-money-bill-wave text-green-500 mr-2"></i>
+                Payment Trends
+            </h3>
+            <div class="chart-container">
+                <canvas id="paymentTrendsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Risk Distribution Chart -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-chart-pie text-purple-500 mr-2"></i>
+                Risk Distribution
+            </h3>
+            <div class="chart-container">
+                <canvas id="riskDistributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- High Risk Alerts -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+            High Risk Deliveries - Immediate Attention Required
+        </h3>
+        <div id="highRiskList" class="space-y-3">
+            <!-- Will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Supplier Performance Table -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-trophy text-yellow-500 mr-2"></i>
+            Supplier Performance Leaderboard
+        </h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">On-Time Rate</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Delay</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Risk Score</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="supplierTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Financial Insights -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Cash Flow -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-water text-blue-500 mr-2"></i>
+                Cash Flow Forecast
+            </h3>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                    <span class="text-sm text-gray-700">Overdue</span>
+                    <span class="text-lg font-bold text-red-600" id="overdueAmount">0 AED</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                    <span class="text-sm text-gray-700">Next 30 Days</span>
+                    <span class="text-lg font-bold text-yellow-600" id="next30Days">0 AED</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <span class="text-sm text-gray-700">Next 60 Days</span>
+                    <span class="text-lg font-bold text-blue-600" id="next60Days">0 AED</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <span class="text-sm text-gray-700">Next 90 Days</span>
+                    <span class="text-lg font-bold text-green-600" id="next90Days">0 AED</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Tracking -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-wallet text-green-500 mr-2"></i>
+                Budget Tracking
+            </h3>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-gray-700">Budget Utilized</span>
+                        <span class="font-bold" id="budgetPercentage">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="budgetBar" class="bg-gradient-to-r from-pkp-green to-green-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm text-gray-700">Total Budget</span>
+                    <span class="text-lg font-bold text-gray-800" id="totalBudget">0 AED</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-pkp-green bg-opacity-10 rounded-lg">
+                    <span class="text-sm text-gray-700">Spent</span>
+                    <span class="text-lg font-bold text-pkp-green" id="spentAmount">0 AED</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <span class="text-sm text-gray-700">Remaining</span>
+                    <span class="text-lg font-bold text-blue-600" id="remainingBudget">0 AED</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Insights -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                Key Insights
+            </h3>
+            <div id="keyInsights" class="space-y-3">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let charts = {};
+
+// Initialize dashboard on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    
+    // Add event listener for date range filter
+    document.getElementById('dateRangeFilter').addEventListener('change', function() {
+        loadDashboardData();
+    });
+});
+
+function refreshDashboard() {
+    loadDashboardData();
+}
+
+async function loadDashboardData() {
+    const dateRange = document.getElementById('dateRangeFilter').value;
+    
+    // Show loading state
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('dashboardContent').classList.add('hidden');
+    
+    try {
+        const response = await fetch(`/analytics/api/dashboard-data?date_range_days=${dateRange}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            populateDashboard(result.data);
+            
+            // Hide loading, show content
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+        } else {
+            showError(result.error);
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showError('Failed to load analytics data');
+    }
+}
+
+function populateDashboard(data) {
+    // Populate Executive Summary KPIs
+    const exec = data.executive_summary;
+    document.getElementById('totalValue').textContent = formatCurrency(exec.total_value);
+    document.getElementById('activePOs').textContent = exec.active_pos;
+    document.getElementById('pendingDeliveries').textContent = exec.pending_deliveries;
+    document.getElementById('highRiskItems').textContent = exec.high_risk_items;
+    
+    // Populate Financial Data
+    const financial = data.financial_analytics;
+    const cashFlow = financial.cash_flow;
+    document.getElementById('overdueAmount').textContent = formatCurrency(cashFlow.overdue) + ' AED';
+    document.getElementById('next30Days').textContent = formatCurrency(cashFlow.next_30_days) + ' AED';
+    document.getElementById('next60Days').textContent = formatCurrency(cashFlow.next_60_days) + ' AED';
+    document.getElementById('next90Days').textContent = formatCurrency(cashFlow.next_90_days) + ' AED';
+    
+    // Budget Tracking
+    const budget = financial.budget;
+    const budgetPercentage = ((budget.spent / budget.total) * 100).toFixed(1);
+    document.getElementById('budgetPercentage').textContent = budgetPercentage + '%';
+    document.getElementById('budgetBar').style.width = budgetPercentage + '%';
+    document.getElementById('totalBudget').textContent = formatCurrency(budget.total) + ' AED';
+    document.getElementById('spentAmount').textContent = formatCurrency(budget.spent) + ' AED';
+    document.getElementById('remainingBudget').textContent = formatCurrency(budget.remaining) + ' AED';
+    
+    // Populate Charts
+    renderSupplierChart(data.supplier_performance);
+    renderDeliveryTrendsChart(data.delivery_intelligence);
+    renderPaymentTrendsChart(financial.payment_trends);
+    renderRiskDistributionChart(data.delay_predictions);
+    
+    // Populate High Risk List
+    renderHighRiskList(data.delay_predictions);
+    
+    // Populate Supplier Performance Table
+    renderSupplierTable(data.supplier_performance);
+    
+    // Generate Key Insights
+    renderKeyInsights(data);
+}
+
+function renderSupplierChart(suppliers) {
+    const ctx = document.getElementById('supplierChart').getContext('2d');
+    
+    // Destroy existing chart if it exists
+    if (charts.supplier) charts.supplier.destroy();
+    
+    const topSuppliers = suppliers.slice(0, 10);
+    
+    charts.supplier = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: topSuppliers.map(s => s.supplier_name),
+            datasets: [{
+                label: 'On-Time Delivery %',
+                data: topSuppliers.map(s => s.on_time_rate),
+                backgroundColor: topSuppliers.map(s => getRiskColor(s.risk_score)),
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'On-Time: ' + context.parsed.y.toFixed(1) + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderDeliveryTrendsChart(delivery) {
+    const ctx = document.getElementById('deliveryTrendsChart').getContext('2d');
+    
+    if (charts.delivery) charts.delivery.destroy();
+    
+    const trends = delivery.volume_trends || [];
+    
+    charts.delivery = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: trends.map(t => t.period),
+            datasets: [{
+                label: 'Deliveries',
+                data: trends.map(t => t.count),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function renderPaymentTrendsChart(paymentTrends) {
+    const ctx = document.getElementById('paymentTrendsChart').getContext('2d');
+    
+    if (charts.payment) charts.payment.destroy();
+    
+    charts.payment = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: paymentTrends.map(t => t.period),
+            datasets: [{
+                label: 'Payments (AED)',
+                data: paymentTrends.map(t => t.amount),
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Amount: ' + formatCurrency(context.parsed.y) + ' AED';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderRiskDistributionChart(predictions) {
+    const ctx = document.getElementById('riskDistributionChart').getContext('2d');
+    
+    if (charts.risk) charts.risk.destroy();
+    
+    const highRisk = predictions.filter(p => p.risk_score >= 70).length;
+    const mediumRisk = predictions.filter(p => p.risk_score >= 40 && p.risk_score < 70).length;
+    const lowRisk = predictions.filter(p => p.risk_score < 40).length;
+    
+    charts.risk = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Low Risk', 'Medium Risk', 'High Risk'],
+            datasets: [{
+                data: [lowRisk, mediumRisk, highRisk],
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function renderHighRiskList(predictions) {
+    const container = document.getElementById('highRiskList');
+    const highRisk = predictions.filter(p => p.risk_score >= 70).slice(0, 5);
+    
+    if (highRisk.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i><p>No high-risk deliveries found!</p></div>';
+        return;
+    }
+    
+    container.innerHTML = highRisk.map(item => `
+        <div class="flex items-center justify-between p-4 border-l-4 border-red-500 bg-red-50 rounded-lg">
+            <div class="flex-1">
+                <div class="flex items-center space-x-3">
+                    <span class="font-bold text-gray-800">PO #${item.po_number}</span>
+                    <span class="text-sm text-gray-600">${item.supplier_name}</span>
+                </div>
+                <div class="mt-2 space-y-1">
+                    ${item.risk_factors.map(factor => `
+                        <div class="flex items-center space-x-2 text-sm text-gray-700">
+                            <i class="fas fa-exclamation-circle text-red-500 text-xs"></i>
+                            <span>${factor}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="ml-4">
+                <div class="text-center">
+                    <div class="risk-badge-high text-white font-bold text-lg px-4 py-2 rounded-lg shadow-lg">
+                        ${item.risk_score}%
+                    </div>
+                    <div class="text-xs text-gray-600 mt-1">Risk Score</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderSupplierTable(suppliers) {
+    const tbody = document.getElementById('supplierTableBody');
+    
+    if (suppliers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No supplier data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = suppliers.slice(0, 10).map((supplier, index) => `
+        <tr class="hover:bg-gray-50 transition">
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                    ${index < 3 ? `<i class="fas fa-trophy text-yellow-500 mr-2"></i>` : ''}
+                    <span class="font-bold text-gray-800">#${index + 1}</span>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="font-medium text-gray-900">${supplier.supplier_name}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                    <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                        <div class="bg-pkp-green h-2 rounded-full" style="width: ${supplier.on_time_rate}%"></div>
+                    </div>
+                    <span class="text-sm font-medium">${supplier.on_time_rate.toFixed(1)}%</span>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="text-sm text-gray-700">${supplier.avg_delay_days.toFixed(1)} days</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="text-sm text-gray-700">${supplier.total_orders}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="text-sm font-bold" style="color: ${getRiskColor(supplier.risk_score)}">${supplier.risk_score.toFixed(0)}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                ${getRiskBadge(supplier.risk_score)}
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderKeyInsights(data) {
+    const container = document.getElementById('keyInsights');
+    const insights = [];
+    
+    const exec = data.executive_summary;
+    const financial = data.financial_analytics;
+    
+    // High risk alert
+    if (exec.high_risk_items > 0) {
+        insights.push({
+            icon: 'fa-exclamation-triangle',
+            color: 'red',
+            text: `${exec.high_risk_items} high-risk deliveries need attention`
+        });
+    }
+    
+    // Overdue payments
+    if (financial.cash_flow.overdue > 0) {
+        insights.push({
+            icon: 'fa-money-bill',
+            color: 'orange',
+            text: `${formatCurrency(financial.cash_flow.overdue)} AED in overdue payments`
+        });
+    }
+    
+    // Budget status
+    const budgetUsed = (financial.budget.spent / financial.budget.total) * 100;
+    if (budgetUsed > 90) {
+        insights.push({
+            icon: 'fa-wallet',
+            color: 'yellow',
+            text: `Budget ${budgetUsed.toFixed(0)}% utilized`
+        });
+    }
+    
+    // Positive insights
+    if (exec.high_risk_items === 0) {
+        insights.push({
+            icon: 'fa-check-circle',
+            color: 'green',
+            text: 'All deliveries on track - great job!'
+        });
+    }
+    
+    container.innerHTML = insights.map(insight => `
+        <div class="flex items-start space-x-3 p-3 bg-${insight.color}-50 border border-${insight.color}-200 rounded-lg">
+            <i class="fas ${insight.icon} text-${insight.color}-500 mt-1"></i>
+            <p class="text-sm text-gray-700 flex-1">${insight.text}</p>
+        </div>
+    `).join('');
+}
+
+function getRiskColor(riskScore) {
+    if (riskScore >= 70) return '#ef4444';
+    if (riskScore >= 40) return '#f59e0b';
+    return '#10b981';
+}
+
+function getRiskBadge(riskScore) {
+    if (riskScore >= 70) {
+        return '<span class="px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">High Risk</span>';
+    } else if (riskScore >= 40) {
+        return '<span class="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Medium Risk</span>';
+    } else {
+        return '<span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Low Risk</span>';
+    }
+}
+
+function formatCurrency(value) {
+    return new Intl.NumberFormat('en-AE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
+}
+
+function showError(message) {
+    document.getElementById('loadingState').innerHTML = `
+        <div class="text-center py-20">
+            <i class="fas fa-exclamation-circle text-red-500 text-5xl mb-4"></i>
+            <p class="text-gray-700 font-medium">${message}</p>
+            <button onclick="refreshDashboard()" class="mt-4 bg-pkp-green text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition">
+                Try Again
+            </button>
+        </div>
+    `;
+}
+</script>
+{% endblock %}

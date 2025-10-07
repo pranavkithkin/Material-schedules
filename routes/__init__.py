@@ -9,6 +9,7 @@ from .deliveries import deliveries_bp
 from .ai_suggestions import ai_suggestions_bp
 from .chat import chat_bp
 from .agents import agents_bp
+from .analytics import analytics_bp
 
 __all__ = [
     'dashboard_bp',
@@ -18,5 +19,6 @@ __all__ = [
     'deliveries_bp',
     'ai_suggestions_bp',
     'chat_bp',
-    'agents_bp'
+    'agents_bp',
+    'analytics_bp'
 ]

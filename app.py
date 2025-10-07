@@ -25,7 +25,8 @@ def create_app():
         deliveries_bp,
         ai_suggestions_bp,
         chat_bp,
-        agents_bp
+        agents_bp,
+        analytics_bp
     )
     from routes.uploads import uploads_bp
     from routes.n8n_webhooks import n8n_bp
@@ -38,6 +39,7 @@ def create_app():
     app.register_blueprint(ai_suggestions_bp, url_prefix='/api/ai_suggestions')
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
     app.register_blueprint(agents_bp, url_prefix='/api/agents')
+    app.register_blueprint(analytics_bp)  # No url_prefix, it's defined in the blueprint
     app.register_blueprint(uploads_bp)
     app.register_blueprint(n8n_bp, url_prefix='/api/n8n')
     

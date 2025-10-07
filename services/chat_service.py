@@ -68,6 +68,14 @@ class ConversationalChatService:
         # Add user message to conversation
         conversation.add_message('user', user_message)
         
+        # Check if this is an action command first (NEW)
+        action_response = self._detect_and_execute_action(user_message)
+        if action_response:
+            conversation.add_message('assistant', action_response['answer'], extra_data=action_response.get('metadata', {}))
+            db.session.commit()
+            action_response['conversation_id'] = conversation.conversation_id
+            return action_response
+        
         # Determine intent if not set
         if not conversation.intent:
             conversation.intent = self._detect_intent(user_message)
@@ -429,6 +437,228 @@ Type 'confirm' to record this payment.
         result = chat_service.process_query(user_message)
         
         return result
+    
+    def _detect_and_execute_action(self, message):
+        """
+        Detect and execute action commands like:
+        - "change all status to approved"
+        - "approve all pending materials"
+        - "update delivery status to delivered"
+        - "mark all as complete"
+        """
+        message_lower = message.lower()
+        
+        # Action: Change/Update approval status
+        if any(word in message_lower for word in ['change', 'update', 'set', 'mark']) and \
+           any(word in message_lower for word in ['status', 'approval']):
+            
+            # Detect target status
+            target_status = None
+            if 'approved' in message_lower or 'approve' in message_lower:
+                target_status = 'Approved'
+            elif 'pending' in message_lower:
+                target_status = 'Pending'
+            elif 'rejected' in message_lower or 'reject' in message_lower:
+                target_status = 'Rejected'
+            
+            if not target_status:
+                return None
+            
+            # Detect scope: all, specific material, or pending
+            scope = 'all'
+            material_filter = None
+            
+            if 'all' in message_lower:
+                scope = 'all'
+            elif 'pending' in message_lower and target_status != 'Pending':
+                scope = 'pending'
+            
+            # Execute the action
+            return self._execute_approval_status_change(target_status, scope, material_filter)
+        
+        # Action: Update delivery status
+        if any(word in message_lower for word in ['update', 'change', 'mark']) and \
+           'delivery' in message_lower:
+            
+            target_status = None
+            if 'delivered' in message_lower or 'complete' in message_lower:
+                target_status = 'Delivered'
+            elif 'in transit' in message_lower or 'transit' in message_lower:
+                target_status = 'In Transit'
+            elif 'pending' in message_lower:
+                target_status = 'Pending'
+            
+            if target_status:
+                return self._execute_delivery_status_change(target_status)
+        
+        # Action: Approve/Reject specific PO
+        if any(word in message_lower for word in ['approve', 'reject']) and 'po' in message_lower:
+            # Extract PO reference
+            po_match = re.search(r'po[-\s]?([a-z0-9-]+)', message_lower)
+            if po_match:
+                po_ref = po_match.group(1).upper()
+                action = 'approve' if 'approve' in message_lower else 'reject'
+                return self._execute_po_action(po_ref, action)
+        
+        return None
+    
+    def _execute_approval_status_change(self, target_status, scope='all', material_filter=None):
+        """
+        Execute approval status change for materials
+        """
+        try:
+            # Build query based on scope
+            query = Material.query
+            
+            if scope == 'pending':
+                query = query.filter_by(approval_status='Pending')
+            elif scope == 'all':
+                # Change all materials
+                pass
+            
+            materials = query.all()
+            
+            if not materials:
+                return {
+                    'answer': f"No materials found to update.",
+                    'action': 'status_change',
+                    'success': False,
+                    'metadata': {'count': 0}
+                }
+            
+            # Update all matching materials
+            count = 0
+            updated_materials = []
+            
+            for material in materials:
+                old_status = material.approval_status
+                material.approval_status = target_status
+                material.updated_at = datetime.now()
+                count += 1
+                updated_materials.append({
+                    'material_type': material.material_type,
+                    'old_status': old_status,
+                    'new_status': target_status
+                })
+            
+            db.session.commit()
+            
+            # Get updated counts
+            status_counts = self._get_approval_status_counts()
+            
+            return {
+                'answer': f"✅ Successfully changed {count} material(s) to '{target_status}'!\n\n" + 
+                         f"📊 Current Status:\n" +
+                         f"- Approved: {status_counts.get('Approved', 0)}\n" +
+                         f"- Pending: {status_counts.get('Pending', 0)}\n" +
+                         f"- Rejected: {status_counts.get('Rejected', 0)}",
+                'action': 'status_change',
+                'success': True,
+                'data': {
+                    'updated_count': count,
+                    'target_status': target_status,
+                    'scope': scope,
+                    'updated_materials': updated_materials[:10],  # First 10 for display
+                    'current_counts': status_counts
+                },
+                'metadata': {
+                    'action_type': 'bulk_status_update',
+                    'count': count,
+                    'status': target_status
+                }
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            return {
+                'answer': f"❌ Error updating status: {str(e)}",
+                'action': 'status_change',
+                'success': False,
+                'metadata': {'error': str(e)}
+            }
+    
+    def _execute_delivery_status_change(self, target_status):
+        """Execute delivery status change"""
+        try:
+            deliveries = Delivery.query.filter(
+                Delivery.delivery_status.in_(['Pending', 'In Transit'])
+            ).all()
+            
+            if not deliveries:
+                return {
+                    'answer': "No pending deliveries to update.",
+                    'action': 'delivery_update',
+                    'success': False
+                }
+            
+            count = 0
+            for delivery in deliveries:
+                delivery.delivery_status = target_status
+                if target_status == 'Delivered':
+                    delivery.actual_delivery_date = datetime.now().date()
+                count += 1
+            
+            db.session.commit()
+            
+            return {
+                'answer': f"✅ Updated {count} deliveries to '{target_status}'!",
+                'action': 'delivery_update',
+                'success': True,
+                'data': {'count': count, 'status': target_status}
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            return {
+                'answer': f"❌ Error: {str(e)}",
+                'action': 'delivery_update',
+                'success': False
+            }
+    
+    def _execute_po_action(self, po_ref, action):
+        """Execute action on specific PO"""
+        try:
+            po = PurchaseOrder.query.filter_by(po_ref=po_ref).first()
+            
+            if not po:
+                return {
+                    'answer': f"❌ Purchase Order {po_ref} not found.",
+                    'action': 'po_action',
+                    'success': False
+                }
+            
+            if action == 'approve':
+                po.po_status = 'Approved'
+                message = f"✅ Purchase Order {po_ref} approved!"
+            else:
+                po.po_status = 'Rejected'
+                message = f"❌ Purchase Order {po_ref} rejected."
+            
+            db.session.commit()
+            
+            return {
+                'answer': message,
+                'action': 'po_action',
+                'success': True,
+                'data': po.to_dict()
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            return {
+                'answer': f"❌ Error: {str(e)}",
+                'action': 'po_action',
+                'success': False
+            }
+    
+    def _get_approval_status_counts(self):
+        """Get current approval status counts"""
+        materials = Material.query.all()
+        counts = {}
+        for material in materials:
+            status = material.approval_status
+            counts[status] = counts.get(status, 0) + 1
+        return counts
 
 
 class ChatService:

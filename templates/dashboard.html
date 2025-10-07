@@ -582,14 +582,22 @@ function loadAlerts() {
             }
             
             data.slice(0, 5).forEach(delivery => {
+                // Extract material type from nested structure
+                const materialType = delivery.purchase_order?.material?.material_type || 
+                                    delivery.material_type || 
+                                    'Unknown';
+                const poRef = delivery.purchase_order?.po_number || 
+                             delivery.po_ref || 
+                             'N/A';
+                
                 const html = `
                     <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
                         <div class="flex items-start">
                             <i class="fas fa-exclamation-circle text-red-500 mr-2 mt-1"></i>
                             <div class="flex-1">
-                                <div class="font-semibold text-red-800">${delivery.material_type || 'Unknown'}</div>
+                                <div class="font-semibold text-red-800">${materialType}</div>
                                 <div class="text-sm text-red-700">Delayed by ${delivery.delay_days || 0} days</div>
-                                <div class="text-xs text-gray-600">PO: ${delivery.po_ref || 'N/A'}</div>
+                                <div class="text-xs text-gray-600">PO: ${poRef}</div>
                             </div>
                         </div>
                     </div>
