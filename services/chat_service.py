@@ -346,9 +346,14 @@ Type 'confirm' to record this payment.
                 entities['expected_delivery_date'] = date_value.isoformat()
                 break
         
-        # Extract supplier name (if message contains "from X")
+        # Extract supplier name (supports both "to supplier" and "from supplier" for natural language)
+        # Note: POs are TO suppliers, but users might say "from" naturally
+        to_match = re.search(r'to\s+([a-z\s&]+?)(?:\s+suppliers?|,|$|\d)', message_lower, re.IGNORECASE)
         from_match = re.search(r'from\s+([a-z\s&]+?)(?:\s+suppliers?|,|$|\d)', message_lower, re.IGNORECASE)
-        if from_match:
+        
+        if to_match:
+            entities['supplier_name'] = to_match.group(1).strip().title()
+        elif from_match:
             entities['supplier_name'] = from_match.group(1).strip().title()
         
         # Extract material type

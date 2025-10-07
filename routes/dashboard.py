@@ -51,6 +51,11 @@ def ai_suggestions_page():
     """AI suggestions review page"""
     return render_template('ai_suggestions.html')
 
+@dashboard_bp.route('/chat')
+def chat_page():
+    """Enhanced chat interface page"""
+    return render_template('chat.html')
+
 @dashboard_bp.route('/test-validation')
 def test_validation_page():
     """Test validation agent page (Sprint 1)"""

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from services.chat_service import ChatService, ConversationalChatService
 from models.conversation import Conversation, ConversationMessage
 from models import db
@@ -44,6 +44,28 @@ def chat():
             user_message=message,
             conversation_id=conversation_id,
             user_id=user_id
+        )
+        
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@chat_bp.route('/message', methods=['POST'])
+def chat_message():
+    """Handle chat messages - Enhanced chat interface endpoint"""
+    try:
+        data = request.get_json()
+        message = data.get('message')
+        session_id = data.get('session_id')
+        
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+        
+        # Use conversational service (session_id maps to conversation_id)
+        response = conversational_service.process_message(
+            user_message=message,
+            conversation_id=session_id,
+            user_id=None
         )
         
         return jsonify(response)
@@ -315,3 +337,78 @@ def delete_conversation(conversation_id):
 def get_chat_history():
     """Get chat history (alias for conversations endpoint)"""
     return get_conversations()
+
+@chat_bp.route('/history/<session_id>', methods=['GET'])
+def get_session_history(session_id):
+    """Get conversation history for a specific session"""
+    try:
+        from models.conversation import Conversation
+        
+        # Get conversation by conversation_id (which maps to session_id)
+        conversation = Conversation.query.filter_by(conversation_id=session_id).first()
+        
+        if not conversation:
+            return jsonify({
+                'success': True,
+                'session_id': session_id,
+                'total': 0,
+                'conversations': []
+            })
+        
+        # Get all messages for this conversation
+        messages = conversation.get_messages()
+        
+        # Format as conversation turns (user message + AI response pairs)
+        conversations = []
+        current_turn = {}
+        
+        for msg in messages:
+            msg_dict = msg.to_dict()
+            
+            if msg_dict.get('role') == 'user':
+                # Start new turn with user message
+                if current_turn:
+                    conversations.append(current_turn)
+                current_turn = {
+                    'user_message': msg_dict.get('content'),
+                    'ai_response': '',
+                    'intent': conversation.intent or 'unknown',
+                    'confidence_score': 0.8,
+                    'created_at': msg_dict.get('created_at')
+                }
+            elif msg_dict.get('role') == 'assistant' and current_turn:
+                # Add AI response to current turn
+                current_turn['ai_response'] = msg_dict.get('content')
+        
+        # Add last turn if exists
+        if current_turn:
+            conversations.append(current_turn)
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'total': len(conversations),
+            'conversations': conversations
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@chat_bp.route('/history/<session_id>', methods=['DELETE'])
+def delete_session_history(session_id):
+    """Delete conversation history for a specific session"""
+    try:
+        from models.conversation import Conversation
+        
+        # Delete conversation by conversation_id (which maps to session_id)
+        conversation = Conversation.query.filter_by(conversation_id=session_id).first()
+        if conversation:
+            db.session.delete(conversation)
+            db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'History deleted for session {session_id}'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

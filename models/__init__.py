@@ -9,3 +9,5 @@ from .purchase_order import PurchaseOrder
 from .payment import Payment
 from .delivery import Delivery
 from .ai_suggestion import AISuggestion
+from .conversation import Conversation, ConversationMessage
+from .file import File
