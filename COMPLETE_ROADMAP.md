@@ -15,8 +15,11 @@
 - **Phase 3:** n8n Automation Workflows - 100% ✅
 - **Phase 4:** Conversational Chat - 100% ✅
 
+### 🔄 In Progress:
+- **Phase 5:** Automated LPO Generation System - 0% 📋 PLANNING
+
 ### ⏳ Remaining:
-- **Phase 5:** Advanced Analytics & Predictions - 0%
+- **Phase 6:** Advanced Analytics & Predictions - 0%
 
 ---
 
@@ -375,10 +378,162 @@ Use SQLAlchemy queries to fetch accurate data before sending to AI.
 
 ---
 
-### PHASE 5: Advanced Analytics & Predictions (Week 5) ⏳ IN PROGRESS
+### PHASE 5: Automated LPO Generation System (Week 5) 📋 PLANNING
+**Goal:** Streamline LPO creation from supplier quotes with AI extraction
+
+#### Step 5.1: Core LPO System 📋 NEXT
+**What to ask Claude:**
+```
+"Create automated LPO generation system:
+
+1. Database Model (models/lpo.py):
+   - LPO number (auto-generated: PKP-LPO-6001-2025-XXX)
+   - LPO date, project, supplier details
+   - Quotation ref, date, items table (JSON)
+   - Payment terms, delivery date
+   - Status (Draft/Issued/Acknowledged/Completed/Void)
+   - PDF path, created by, timestamps
+
+2. Routes (routes/lpo.py):
+   POST /api/lpo/extract - Extract from quote
+   POST /api/lpo/create - Create LPO
+   GET  /api/lpo/<id> - Get details
+   GET  /api/lpo/<id>/pdf - Download PDF
+   PUT  /api/lpo/<id> - Update LPO
+   POST /api/lpo/<id>/issue - Mark as issued
+
+3. Service (services/lpo_service.py):
+   - generate_lpo_number()
+   - create_lpo(data)
+   - generate_pdf(lpo_id)
+   - calculate_totals(items)
+
+4. Templates:
+   - lpo_create.html - Create/upload quote
+   - lpo_list.html - List all LPOs
+   - lpo_view.html - View LPO details
+
+Required LPO fields:
+- LPO No, Date, Project, Supplier, Quote Ref, Quote Date
+- Address, TRN, Contact Person, Contact Number
+- Items table (description, qty, unit, rate, amount)
+- Subtotal, VAT (5%), Grand Total
+- Payment Terms, Delivery Date
+
+Include manual entry workflow first, AI extraction in next step."
+```
+
+**✅ Deliverable:** Manual LPO creation working with PDF generation
+
+#### Step 5.2: AI Quote Extraction 📋
+**What to ask Claude:**
+```
+"Add AI extraction to LPO system:
+
+1. Extraction Service (services/lpo_extraction.py):
+   - extract_from_pdf(file_path) - Extract text
+   - parse_with_gpt4(text) - Use GPT-4 to identify fields
+   - extract_items_table(text) - Parse items
+   - Return data + confidence scores
+
+2. GPT-4 Prompt:
+   Extract these fields from supplier quotation:
+   - Supplier name, address, TRN
+   - Contact person, phone
+   - Quote ref, date
+   - Items (description, qty, unit, price)
+   - Payment terms, delivery time
+   Return JSON with confidence scores (0-100)
+
+3. Review UI:
+   - Show extracted fields with confidence
+   - Green checkmark (>90%), yellow warning (<90%)
+   - Allow editing before PDF generation
+   - Highlight missing fields
+
+4. Dependencies:
+   - PyPDF2 or pdfplumber (PDF text extraction)
+   - pytesseract (OCR for images)
+   - openai (GPT-4 API)
+
+Include upload → extract → review → edit → generate workflow."
+```
+
+**✅ Deliverable:** Upload quote PDF → Auto-extract → Generate LPO
+
+#### Step 5.3: Professional PDF Template 📋
+**What to ask Claude:**
+```
+"Create professional LPO PDF template:
+
+1. PDF Generator (services/pdf_generator.py):
+   - Use WeasyPrint or ReportLab
+   - Professional layout with company branding
+   - Items table with proper formatting
+   - Calculations (subtotal, VAT, total)
+   - Terms & conditions section
+   - Signature section
+
+2. Template Design:
+   - Company logo and header
+   - LPO number and date prominent
+   - Supplier details section
+   - Items table with borders
+   - Payment terms and delivery date
+   - Multi-page support
+   - Print-ready format
+
+3. Branding:
+   - PKP Contracting LLC logo
+   - Company colors
+   - Professional fonts
+   - Clean, organized layout
+
+Provide HTML/CSS template or ReportLab code for PDF generation."
+```
+
+**✅ Deliverable:** Professional, branded LPO PDFs
+
+#### Step 5.4: Integration & Workflow 📋
+**What to ask Claude:**
+```
+"Complete LPO system integration:
+
+1. Link to Purchase Orders:
+   - Create PurchaseOrder record from LPO
+   - Link LPO to existing PO tracking
+   - Update delivery tracking
+
+2. Status Workflow:
+   - Draft → Edit/save
+   - Issued → Mark as sent to supplier
+   - Acknowledged → Supplier confirms
+   - Completed → Delivery done
+   - Void → Cancel LPO
+
+3. Additional Features:
+   - Email LPO to supplier (Flask-Mail)
+   - Search/filter LPOs (by supplier, date, status)
+   - LPO analytics in dashboard
+   - Export LPO list to Excel
+
+4. Tests:
+   - test_lpo_service.py
+   - test_lpo_extraction.py
+   - test_pdf_generator.py
+
+Include complete workflow from quote upload to delivery tracking."
+```
+
+**✅ Deliverable:** Fully integrated LPO system with status tracking
+**Status:** 📋 PLANNING - See PHASE_5_LPO_GENERATION_PLAN.md for details
+
+---
+
+### PHASE 6: Advanced Analytics & Predictions (Week 6) ⏳ PENDING
 **Goal:** Business intelligence, predictions, and advanced features
 
-#### Step 5.1: Analytics Dashboard ⏳ NEXT
+#### Step 6.1: Analytics Dashboard ⏳ NEXT
 **What to ask Claude:**
 ```
 "Create analytics dashboard with:
