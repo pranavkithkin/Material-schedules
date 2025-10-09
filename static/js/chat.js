@@ -399,3 +399,23 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// ==========================================
+// Chat Modal Functions
+// ==========================================
+
+// Open Chat Modal
+function openChatModal() {
+    document.getElementById('chat-modal').classList.remove('hidden');
+    document.getElementById('chat-input').focus();
+}
+
+// Close chat modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const chatModal = document.getElementById('chat-modal');
+        if (!chatModal.classList.contains('hidden')) {
+            closeChatModal();
+        }
+    }
+});

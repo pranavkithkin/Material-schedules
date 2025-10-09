@@ -51,6 +51,16 @@
             </div>
         </div>
 
+        <!-- LPO Action Button -->
+        <div class="mb-6 flex justify-end">
+            <button id="openLpoModal" 
+                    class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-200 flex items-center space-x-2 font-semibold">
+                <i class="fas fa-file-invoice text-xl"></i>
+                <span>Add New LPO</span>
+                <i class="fas fa-plus-circle"></i>
+            </button>
+        </div>
+
         <!-- Chat Examples -->
         <div class="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-lg mb-6 border border-purple-200">
             <h3 class="font-semibold text-gray-800 mb-3">💡 Try asking:</h3>
@@ -367,6 +377,801 @@
             }
         `;
         document.head.appendChild(style);
+    </script>
+
+    <!-- LPO Modal -->
+    <div id="lpoModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity" onclick="closeLpoModal()"></div>
+        
+        <!-- Modal Content -->
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="relative bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden animate-fadeIn">
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-file-invoice text-2xl"></i>
+                        <div>
+                            <h2 class="text-2xl font-bold">Create New LPO</h2>
+                            <p class="text-sm text-green-100">Upload supplier quote and generate purchase order</p>
+                        </div>
+                    </div>
+                    <button onclick="closeLpoModal()" class="hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 140px);">
+                    <!-- Step 1: Upload Section -->
+                    <div id="uploadSection" class="space-y-4">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                            <span class="bg-green-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                            <span>Upload Supplier Quotation</span>
+                        </h3>
+                        
+                        <!-- Drag & Drop Area -->
+                        <div id="dropZone" 
+                             class="border-3 border-dashed border-gray-300 hover:border-green-500 rounded-xl p-12 text-center cursor-pointer transition-all duration-200 bg-gray-50 hover:bg-green-50"
+                             ondrop="handleDrop(event)" 
+                             ondragover="handleDragOver(event)" 
+                             ondragleave="handleDragLeave(event)"
+                             onclick="document.getElementById('fileInput').click()">
+                            <div class="space-y-4">
+                                <i class="fas fa-cloud-upload-alt text-6xl text-gray-400"></i>
+                                <div>
+                                    <p class="text-xl font-semibold text-gray-700">Drop your quote file here</p>
+                                    <p class="text-gray-500 mt-2">or click to browse</p>
+                                </div>
+                                <div class="flex justify-center space-x-4 text-sm text-gray-600">
+                                    <span><i class="fas fa-file-pdf text-red-500"></i> PDF</span>
+                                    <span><i class="fas fa-file-word text-blue-500"></i> DOCX</span>
+                                    <span><i class="fas fa-file-excel text-green-600"></i> XLSX</span>
+                                </div>
+                                <p class="text-xs text-gray-500">Maximum file size: 20MB</p>
+                            </div>
+                            <input type="file" 
+                                   id="fileInput" 
+                                   class="hidden" 
+                                   accept=".pdf,.docx,.xlsx,.doc,.xls"
+                                   onchange="handleFileSelect(event)">
+                        </div>
+
+                        <!-- Selected File Display -->
+                        <div id="selectedFile" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-pdf text-3xl text-red-500"></i>
+                                <div>
+                                    <p id="fileName" class="font-semibold text-gray-800"></p>
+                                    <p id="fileSize" class="text-sm text-gray-600"></p>
+                                </div>
+                            </div>
+                            <button onclick="clearFile()" class="text-red-500 hover:text-red-700 transition">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </div>
+
+                        <!-- Extract Button -->
+                        <button id="extractButton" 
+                                onclick="extractQuoteData()" 
+                                class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled>
+                            <i class="fas fa-magic"></i> Extract Data from Quote
+                        </button>
+                    </div>
+
+                    <!-- Step 2: Loading State -->
+                    <div id="loadingSection" class="hidden text-center py-12 space-y-6">
+                        <div class="relative inline-block">
+                            <div class="w-24 h-24 border-8 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
+                            <i class="fas fa-robot text-4xl text-green-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">Extracting Data...</h3>
+                            <p class="text-gray-600 mt-2">AI is analyzing the quotation</p>
+                            <p class="text-sm text-gray-500 mt-4">This may take 10-30 seconds</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: LPO Form (Hidden initially, shown after extraction) -->
+                    <div id="lpoFormSection" class="hidden space-y-6">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                            <span class="bg-green-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                            <span>Review & Edit LPO Details</span>
+                        </h3>
+
+                        <!-- LPO Form will be dynamically inserted here -->
+                        <div id="lpoFormContent"></div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex space-x-4 pt-4 border-t">
+                            <button onclick="saveLPODraft()" 
+                                    class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-semibold transition">
+                                <i class="fas fa-save"></i> Save Draft
+                            </button>
+                            <button onclick="generateLPOPDF()" 
+                                    class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-3 rounded-lg font-semibold transition shadow-lg hover:shadow-xl">
+                                <i class="fas fa-file-pdf"></i> Generate LPO PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LPO Modal Scripts -->
+    <script>
+        let selectedFile = null;
+        let extractedData = null;
+
+        // Open Modal
+        document.getElementById('openLpoModal').addEventListener('click', function() {
+            document.getElementById('lpoModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        });
+
+        // Close Modal
+        function closeLpoModal() {
+            document.getElementById('lpoModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            resetModal();
+        }
+
+        // Reset Modal to initial state
+        function resetModal() {
+            selectedFile = null;
+            extractedData = null;
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('loadingSection').classList.add('hidden');
+            document.getElementById('lpoFormSection').classList.add('hidden');
+            document.getElementById('selectedFile').classList.add('hidden');
+            document.getElementById('extractButton').disabled = true;
+            document.getElementById('fileInput').value = '';
+        }
+
+        // Handle Drag Over
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('dropZone').classList.add('border-green-500', 'bg-green-50');
+        }
+
+        // Handle Drag Leave
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('dropZone').classList.remove('border-green-500', 'bg-green-50');
+        }
+
+        // Handle Drop
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('dropZone').classList.remove('border-green-500', 'bg-green-50');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // Handle File Select
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // Handle File
+        function handleFile(file) {
+            // Validate file type
+            const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Please upload a PDF, Word, or Excel file');
+                return;
+            }
+
+            // Validate file size (20MB)
+            if (file.size > 20 * 1024 * 1024) {
+                alert('File size must be less than 20MB');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // Display selected file
+            document.getElementById('selectedFile').classList.remove('hidden');
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('extractButton').disabled = false;
+
+            // Update file icon based on type
+            const icon = document.querySelector('#selectedFile i');
+            if (file.type.includes('pdf')) {
+                icon.className = 'fas fa-file-pdf text-3xl text-red-500';
+            } else if (file.type.includes('word')) {
+                icon.className = 'fas fa-file-word text-3xl text-blue-500';
+            } else if (file.type.includes('excel') || file.type.includes('spreadsheet')) {
+                icon.className = 'fas fa-file-excel text-3xl text-green-600';
+            }
+        }
+
+        // Clear File
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('selectedFile').classList.add('hidden');
+            document.getElementById('extractButton').disabled = true;
+            document.getElementById('fileInput').value = '';
+        }
+
+        // Format File Size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Extract Quote Data (Step 1 -> Step 2)
+        async function extractQuoteData() {
+            if (!selectedFile) return;
+
+            // Show loading
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('loadingSection').classList.remove('hidden');
+
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                // Call n8n webhook endpoint
+                const response = await fetch('/api/n8n/lpo-extract-quote', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Extraction failed');
+                }
+
+                extractedData = await response.json();
+                
+                // Show form with extracted data
+                renderLPOForm(extractedData);
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('lpoFormSection').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to extract data from quote. Please try again or enter manually.');
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('uploadSection').classList.remove('hidden');
+            }
+        }
+
+        // Render LPO Form with extracted data
+        function renderLPOForm(data) {
+            console.log('Rendering form with data:', data);
+            
+            // Store data for later use
+            if (data.data) {
+                extractedData = data.data;
+            } else {
+                extractedData = data;
+            }
+            
+            const formData = extractedData;
+            const supplier = formData.supplier || {};
+            const terms = formData.terms || {};
+            const columnStructure = formData.column_structure || ["DESCRIPTION", "UNIT", "QTY", "RATE"];
+            const items = formData.items || [];
+            
+            // Build form HTML
+            const formHTML = `
+                <!-- Supplier Information Section -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+                    <h4 class="font-semibold text-gray-700 flex items-center space-x-2 border-b pb-2">
+                        <i class="fas fa-building text-blue-500"></i>
+                        <span>Supplier Information</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name *</label>
+                            <input type="text" id="supplierName" value="${supplier.name || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                   required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">TRN</label>
+                            <input type="text" id="supplierTrn" value="${supplier.trn || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <input type="text" id="supplierAddress" value="${supplier.address || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Telephone</label>
+                            <input type="text" id="supplierTel" value="${supplier.tel || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                            <input type="text" id="supplierContact" value="${supplier.contact_person || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project & Quote Information Section -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+                    <h4 class="font-semibold text-gray-700 flex items-center space-x-2 border-b pb-2">
+                        <i class="fas fa-project-diagram text-purple-500"></i>
+                        <span>Project & Quote Details</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
+                            <input type="text" id="projectName" value="${formData.project_name || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                   required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Project Location</label>
+                            <input type="text" id="projectLocation" value="${formData.project_location || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Quote Reference</label>
+                            <input type="text" id="quoteRef" value="${formData.quote_ref || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Quote Date</label>
+                            <input type="date" id="quoteDate" value="${formData.quote_date || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items Table Section -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b pb-2">
+                        <h4 class="font-semibold text-gray-700 flex items-center space-x-2">
+                            <i class="fas fa-list text-green-500"></i>
+                            <span>Items</span>
+                        </h4>
+                        <button onclick="addItemRow()" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">
+                            <i class="fas fa-plus"></i> Add Item
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm" id="itemsTable">
+                            <thead class="bg-gray-50 border-b-2 border-gray-200">
+                                <tr>
+                                    <th class="px-2 py-2 text-left font-semibold text-gray-700 w-12">#</th>
+                                    ${columnStructure.map(col => 
+                                        `<th class="px-2 py-2 text-left font-semibold text-gray-700">${col}</th>`
+                                    ).join('')}
+                                    <th class="px-2 py-2 text-right font-semibold text-gray-700">AMOUNT</th>
+                                    <th class="px-2 py-2 text-center font-semibold text-gray-700 w-16">
+                                        <i class="fas fa-trash text-gray-400"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsTableBody">
+                                <!-- Items will be dynamically inserted -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totals Section -->
+                    <div class="border-t pt-4 mt-4">
+                        <div class="flex justify-end">
+                            <div class="w-full md:w-1/2 space-y-2">
+                                <div class="flex justify-between items-center py-2 border-b">
+                                    <span class="font-medium text-gray-700">Subtotal:</span>
+                                    <span class="text-lg font-semibold text-gray-800" id="subtotalDisplay">0.00 AED</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b">
+                                    <span class="font-medium text-gray-700">VAT (5%):</span>
+                                    <span class="text-lg font-semibold text-gray-800" id="vatDisplay">0.00 AED</span>
+                                </div>
+                                <div class="flex justify-between items-center py-3 bg-green-50 px-4 rounded-lg">
+                                    <span class="font-bold text-gray-800 text-lg">Grand Total:</span>
+                                    <span class="text-2xl font-bold text-green-600" id="grandTotalDisplay">0.00 AED</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terms & Conditions Section -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+                    <h4 class="font-semibold text-gray-700 flex items-center space-x-2 border-b pb-2">
+                        <i class="fas fa-file-contract text-orange-500"></i>
+                        <span>Terms & Conditions</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                            <input type="text" id="paymentTerms" value="${terms.payment || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                   placeholder="e.g., 30 days from delivery">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Delivery Terms</label>
+                            <input type="text" id="deliveryTerms" value="${terms.delivery || ''}" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                   placeholder="e.g., Within 7 days from PO">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                            <textarea id="additionalNotes" rows="3" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                      placeholder="Any additional terms or conditions...">${terms.notes || ''}</textarea>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Insert form HTML
+            document.getElementById('lpoFormContent').innerHTML = formHTML;
+            
+            // Store column structure globally
+            window.lpoColumnStructure = columnStructure;
+            
+            // Populate items table
+            if (items.length > 0) {
+                items.forEach((item, index) => {
+                    addItemRow(item);
+                });
+            } else {
+                // Add one empty row
+                addItemRow();
+            }
+            
+            // Calculate totals
+            calculateTotals();
+        }
+
+        // Add Item Row to table
+        function addItemRow(itemData = null) {
+            const tbody = document.getElementById('itemsTableBody');
+            const rowCount = tbody.children.length + 1;
+            const columnStructure = window.lpoColumnStructure || ["DESCRIPTION", "UNIT", "QTY", "RATE"];
+            
+            const row = document.createElement('tr');
+            row.className = 'border-b hover:bg-gray-50 transition';
+            row.dataset.rowId = rowCount;
+            
+            // Build row HTML
+            let rowHTML = `<td class="px-2 py-2 text-gray-600 font-medium">${rowCount}</td>`;
+            
+            // Add input for each column
+            columnStructure.forEach(col => {
+                const colKey = col.toLowerCase().replace(/\s+/g, '_');
+                let value = '';
+                let inputType = 'text';
+                let inputClass = 'w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500';
+                
+                // Get value from itemData
+                if (itemData) {
+                    value = itemData[colKey] || itemData[col.toLowerCase()] || '';
+                }
+                
+                // Numeric columns
+                if (['QTY', 'RATE', 'QUANTITY', 'PRICE'].includes(col.toUpperCase())) {
+                    inputType = 'number';
+                    inputClass += ' text-right';
+                    if (value) value = parseFloat(value).toFixed(2);
+                }
+                
+                rowHTML += `
+                    <td class="px-2 py-2">
+                        <input type="${inputType}" 
+                               data-column="${col}" 
+                               value="${value}" 
+                               onchange="calculateTotals()"
+                               class="${inputClass}"
+                               ${inputType === 'number' ? 'step="0.01" min="0"' : ''}>
+                    </td>
+                `;
+            });
+            
+            // Amount column (calculated)
+            rowHTML += `
+                <td class="px-2 py-2">
+                    <input type="text" 
+                           class="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-right font-semibold text-gray-700" 
+                           readonly 
+                           data-amount 
+                           value="0.00">
+                </td>
+            `;
+            
+            // Delete button
+            rowHTML += `
+                <td class="px-2 py-2 text-center">
+                    <button onclick="removeItemRow(this)" 
+                            class="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            
+            row.innerHTML = rowHTML;
+            tbody.appendChild(row);
+            
+            // Recalculate row numbers
+            updateRowNumbers();
+            calculateTotals();
+        }
+
+        // Remove Item Row
+        function removeItemRow(button) {
+            const row = button.closest('tr');
+            row.remove();
+            updateRowNumbers();
+            calculateTotals();
+        }
+
+        // Update Row Numbers
+        function updateRowNumbers() {
+            const tbody = document.getElementById('itemsTableBody');
+            Array.from(tbody.children).forEach((row, index) => {
+                row.children[0].textContent = index + 1;
+                row.dataset.rowId = index + 1;
+            });
+        }
+
+        // Calculate Totals
+        function calculateTotals() {
+            const tbody = document.getElementById('itemsTableBody');
+            const rows = Array.from(tbody.children);
+            const columnStructure = window.lpoColumnStructure || ["DESCRIPTION", "UNIT", "QTY", "RATE"];
+            
+            // Find QTY and RATE column indices
+            const qtyIndex = columnStructure.findIndex(col => 
+                ['QTY', 'QUANTITY'].includes(col.toUpperCase())
+            );
+            const rateIndex = columnStructure.findIndex(col => 
+                ['RATE', 'PRICE'].includes(col.toUpperCase())
+            );
+            
+            let subtotal = 0;
+            
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll('input[data-column]');
+                let qty = 0;
+                let rate = 0;
+                
+                inputs.forEach(input => {
+                    const col = input.dataset.column.toUpperCase();
+                    const value = parseFloat(input.value) || 0;
+                    
+                    if (['QTY', 'QUANTITY'].includes(col)) {
+                        qty = value;
+                    } else if (['RATE', 'PRICE'].includes(col)) {
+                        rate = value;
+                    }
+                });
+                
+                const amount = qty * rate;
+                subtotal += amount;
+                
+                // Update amount field in row
+                const amountField = row.querySelector('input[data-amount]');
+                if (amountField) {
+                    amountField.value = amount.toFixed(2);
+                }
+            });
+            
+            // Calculate VAT and Grand Total
+            const vat = subtotal * 0.05; // 5% VAT
+            const grandTotal = subtotal + vat;
+            
+            // Update display
+            document.getElementById('subtotalDisplay').textContent = subtotal.toFixed(2) + ' AED';
+            document.getElementById('vatDisplay').textContent = vat.toFixed(2) + ' AED';
+            document.getElementById('grandTotalDisplay').textContent = grandTotal.toFixed(2) + ' AED';
+        }
+
+        // Collect Form Data
+        function collectFormData() {
+            const columnStructure = window.lpoColumnStructure || ["DESCRIPTION", "UNIT", "QTY", "RATE"];
+            
+            // Collect supplier data
+            const supplier = {
+                name: document.getElementById('supplierName').value,
+                trn: document.getElementById('supplierTrn').value,
+                address: document.getElementById('supplierAddress').value,
+                tel: document.getElementById('supplierTel').value,
+                contact_person: document.getElementById('supplierContact').value
+            };
+            
+            // Collect project data
+            const project_name = document.getElementById('projectName').value;
+            const project_location = document.getElementById('projectLocation').value;
+            const quote_ref = document.getElementById('quoteRef').value;
+            const quote_date = document.getElementById('quoteDate').value;
+            
+            // Collect items
+            const tbody = document.getElementById('itemsTableBody');
+            const rows = Array.from(tbody.children);
+            const items = rows.map((row, index) => {
+                const item = { number: index + 1 };
+                const inputs = row.querySelectorAll('input[data-column]');
+                
+                inputs.forEach(input => {
+                    const col = input.dataset.column;
+                    const colKey = col.toLowerCase().replace(/\s+/g, '_');
+                    const value = input.value;
+                    
+                    // Parse numeric values
+                    if (['QTY', 'RATE', 'QUANTITY', 'PRICE'].includes(col.toUpperCase())) {
+                        item[colKey] = parseFloat(value) || 0;
+                    } else {
+                        item[colKey] = value;
+                    }
+                });
+                
+                // Add calculated amount
+                const amountField = row.querySelector('input[data-amount]');
+                item.amount = parseFloat(amountField.value) || 0;
+                
+                return item;
+            }).filter(item => {
+                // Filter out empty rows (no description)
+                const descKey = columnStructure.find(col => 
+                    col.toUpperCase().includes('DESC')
+                )?.toLowerCase().replace(/\s+/g, '_');
+                return descKey ? item[descKey] : true;
+            });
+            
+            // Collect terms
+            const terms = {
+                payment: document.getElementById('paymentTerms').value,
+                delivery: document.getElementById('deliveryTerms').value,
+                notes: document.getElementById('additionalNotes').value
+            };
+            
+            // Return complete form data
+            return {
+                supplier,
+                project_name,
+                project_location,
+                quote_ref,
+                quote_date,
+                column_structure: columnStructure,
+                items,
+                terms
+            };
+        }
+
+        // Validate Form
+        function validateForm() {
+            const data = collectFormData();
+            const errors = [];
+            
+            // Check required fields
+            if (!data.supplier.name || data.supplier.name.trim() === '') {
+                errors.push('Supplier name is required');
+            }
+            
+            if (!data.project_name || data.project_name.trim() === '') {
+                errors.push('Project name is required');
+            }
+            
+            if (!data.items || data.items.length === 0) {
+                errors.push('At least one item is required');
+            }
+            
+            // Check if items have required data
+            if (data.items && data.items.length > 0) {
+                const hasEmptyItems = data.items.some(item => {
+                    const hasDesc = Object.values(item).some(val => 
+                        typeof val === 'string' && val.trim() !== ''
+                    );
+                    return !hasDesc;
+                });
+                
+                if (hasEmptyItems) {
+                    errors.push('All items must have at least a description');
+                }
+            }
+            
+            return { valid: errors.length === 0, errors };
+        }
+
+        // Save LPO Draft
+        async function saveLPODraft() {
+            const validation = validateForm();
+            if (!validation.valid) {
+                alert('Please fix the following errors:\n\n' + validation.errors.join('\n'));
+                return;
+            }
+            
+            const formData = collectFormData();
+            formData.status = 'draft';
+            
+            // TODO: Implement draft save to backend
+            console.log('Saving draft:', formData);
+            alert('Draft save functionality will be implemented soon.\n\nFor now, data is logged to console.');
+        }
+
+        // Generate LPO PDF
+        async function generateLPOPDF() {
+            // Validate form
+            const validation = validateForm();
+            if (!validation.valid) {
+                alert('Please fix the following errors:\n\n' + validation.errors.join('\n'));
+                return;
+            }
+            
+            // Collect form data
+            const formData = collectFormData();
+            formData.status = 'issued';
+            
+            // Show loading in button
+            const button = event.target;
+            const originalHTML = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            
+            try {
+                // Call n8n webhook endpoint
+                const response = await fetch('/api/n8n/lpo-generate-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('PDF generation failed');
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show success message
+                    alert(`✅ LPO Generated Successfully!\n\nLPO Number: ${result.lpo_number}\nGrand Total: ${result.totals.grand_total.toFixed(2)} AED\n\nDownloading PDF...`);
+                    
+                    // Download PDF
+                    window.open(result.pdf_url, '_blank');
+                    
+                    // Close modal after short delay
+                    setTimeout(() => {
+                        closeLpoModal();
+                    }, 1000);
+                } else {
+                    throw new Error(result.message || 'PDF generation failed');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Failed to generate LPO PDF.\n\n' + error.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('lpoModal').classList.contains('hidden')) {
+                closeLpoModal();
+            }
+        });
     </script>
 </body>
 </html>

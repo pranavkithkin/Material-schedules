@@ -51,10 +51,12 @@ def ai_suggestions_page():
     """AI suggestions review page"""
     return render_template('ai_suggestions.html')
 
-@dashboard_bp.route('/chat')
-def chat_page():
-    """Enhanced chat interface page"""
-    return render_template('chat.html')
+@dashboard_bp.route('/lpo')
+def lpo_page():
+    """Local Purchase Orders (LPO) management page"""
+    import os
+    api_key = os.getenv('N8N_TO_FLASK_API_KEY', '')
+    return render_template('lpo.html', config={'N8N_TO_FLASK_API_KEY': api_key})
 
 @dashboard_bp.route('/test-validation')
 def test_validation_page():

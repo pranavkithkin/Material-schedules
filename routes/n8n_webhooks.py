@@ -1273,3 +1273,362 @@ def log_notification():
             'error': 'Failed to log notification',
             'message': str(e)
         }), 500
+
+
+# ============================================================================
+# LPO ENDPOINTS - Phase 5
+# ============================================================================
+
+@n8n_bp.route('/lpo-extract-quote', methods=['POST'])
+def lpo_extract_quote():
+    """
+    Extract data from supplier quotation file for LPO creation.
+    
+    This endpoint receives an uploaded quote file (PDF/DOCX/XLSX),
+    saves it temporarily, and processes it to extract structured data.
+    
+    In production, this would call an n8n workflow that uses AI (GPT-4)
+    to extract supplier information, items, and pricing.
+    
+    For now, it returns mock data based on file type.
+    
+    Expected: multipart/form-data with 'file' field
+    
+    Returns:
+    {
+        "success": true,
+        "data": {
+            "supplier": {
+                "name": "ABC Trading LLC",
+                "trn": "100123456700003",
+                "address": "Industrial Area, Sharjah",
+                "tel": "+971-6-1234567",
+                "fax": "+971-6-1234568",
+                "contact_person": "Mohammed Ahmed",
+                "contact_number": "+971-50-1234567"
+            },
+            "quote_ref": "QT-2025-001",
+            "quote_date": "2025-10-05",
+            "project_name": "Villa Construction Project",
+            "project_location": "Dubai",
+            "column_structure": ["MAKE", "CODE", "DESCRIPTION", "UNIT", "QTY", "RATE"],
+            "items": [
+                {
+                    "number": 1,
+                    "make": "Tata Steel",
+                    "code": "TMT-16",
+                    "description": "TMT Steel Bar 16mm",
+                    "unit": "Ton",
+                    "quantity": 5.0,
+                    "rate": 2800.00
+                }
+            ],
+            "terms": {
+                "payment": "30 days from delivery",
+                "delivery": "Within 7 days from PO"
+            },
+            "confidence": 95
+        }
+    }
+    """
+    try:
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file uploaded'
+            }), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+        
+        # Validate file type
+        allowed_extensions = {'.pdf', '.docx', '.xlsx', '.doc', '.xls'}
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        
+        if file_ext not in allowed_extensions:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
+            }), 400
+        
+        # Save file temporarily
+        upload_folder = os.path.join('uploads', 'temp', 'lpo_quotes')
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safe_filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join(upload_folder, safe_filename)
+        
+        file.save(file_path)
+        
+        # TODO: In production, call n8n workflow here
+        # response = requests.post(
+        #     'https://your-n8n-instance.com/webhook/lpo-extract',
+        #     files={'file': open(file_path, 'rb')}
+        # )
+        # extracted_data = response.json()
+        
+        # For now, return mock data based on file type
+        # This simulates what n8n + GPT-4 would return
+        
+        # Simulate processing delay
+        import time
+        time.sleep(2)  # Remove this in production
+        
+        # Mock extracted data (would come from n8n/GPT-4)
+        extracted_data = {
+            "supplier": {
+                "name": "ABC Steel Trading LLC",
+                "trn": "100123456700003",
+                "address": "Industrial Area 3, Sharjah, UAE",
+                "tel": "+971-6-1234567",
+                "fax": "+971-6-1234568",
+                "contact_person": "Mohammed Ahmed",
+                "contact_number": "+971-50-1234567"
+            },
+            "quote_ref": "QT-2025-" + timestamp[:4],
+            "quote_date": datetime.now().strftime('%Y-%m-%d'),
+            "project_name": "Villa Construction - Al Barsha",
+            "project_location": "Al Barsha, Dubai",
+            "column_structure": ["MAKE", "CODE", "DESCRIPTION", "UNIT", "QTY", "RATE"],
+            "items": [
+                {
+                    "number": 1,
+                    "make": "Tata Steel",
+                    "code": "TMT-16",
+                    "description": "TMT Steel Bar 16mm",
+                    "unit": "Ton",
+                    "quantity": 5.0,
+                    "rate": 2800.00
+                },
+                {
+                    "number": 2,
+                    "make": "Jindal",
+                    "code": "TMT-20",
+                    "description": "TMT Steel Bar 20mm",
+                    "unit": "Ton",
+                    "quantity": 3.0,
+                    "rate": 2850.00
+                },
+                {
+                    "number": 3,
+                    "make": "Local",
+                    "code": "MESH-6",
+                    "description": "Welded Wire Mesh 6mm",
+                    "unit": "Sqm",
+                    "quantity": 100.0,
+                    "rate": 25.00
+                }
+            ],
+            "terms": {
+                "payment": "30 days from delivery",
+                "delivery": "Within 7 days from PO date",
+                "warranty": "As per manufacturer warranty"
+            },
+            "confidence": 95,
+            "file_path": file_path
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': extracted_data,
+            'message': 'Quote data extracted successfully'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to extract quote data',
+            'message': str(e)
+        }), 500
+
+
+@n8n_bp.route('/lpo-generate-pdf', methods=['POST'])
+def lpo_generate_pdf():
+    """
+    Generate LPO PDF from finalized form data.
+    
+    This endpoint receives the complete LPO data (after user review/edit),
+    generates an LPO number, saves to database, and generates PDF.
+    
+    In production, this would call an n8n workflow that:
+    1. Generates LPO PDF using a template
+    2. Saves PDF to storage
+    3. Optionally emails to supplier
+    
+    Expected JSON body:
+    {
+        "supplier": {...},
+        "project": {...},
+        "quote_ref": "...",
+        "items": [...],
+        "terms": {...}
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "lpo_number": "LPO/PKP/2025/0001",
+        "pdf_url": "/uploads/lpos/LPO_PKP_2025_0001.pdf",
+        "message": "LPO generated successfully"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        # Validate required fields
+        required_fields = ['supplier', 'items']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required field: {field}'
+                }), 400
+        
+        # Generate LPO number (LPO/PKP/YYYY/NNNN)
+        from models.lpo import LPO
+        from services.lpo_service import LPOService
+        
+        lpo_number = LPOService.generate_lpo_number()
+        
+        # Calculate totals
+        subtotal = 0
+        for item in data['items']:
+            qty = float(item.get('quantity', 0))
+            rate = float(item.get('rate', item.get('unit_price', 0)))
+            amount = qty * rate
+            item['amount'] = amount
+            subtotal += amount
+        
+        vat_percentage = 5.0
+        vat_amount = subtotal * (vat_percentage / 100)
+        grand_total = subtotal + vat_amount
+        
+        # Prepare LPO data for database
+        lpo_data = {
+            'lpo_number': lpo_number,
+            'lpo_date': datetime.now().date(),
+            'supplier_name': data['supplier'].get('name'),
+            'supplier_trn': data['supplier'].get('trn'),
+            'supplier_address': data['supplier'].get('address'),
+            'supplier_tel': data['supplier'].get('tel'),
+            'supplier_fax': data['supplier'].get('fax'),
+            'contact_person': data['supplier'].get('contact_person'),
+            'contact_number': data['supplier'].get('contact_number'),
+            'project_name': data.get('project_name', data.get('project', {}).get('name')),
+            'project_location': data.get('project_location', data.get('project', {}).get('location')),
+            'quotation_ref': data.get('quote_ref'),
+            'quotation_date': datetime.strptime(data.get('quote_date'), '%Y-%m-%d').date() if data.get('quote_date') else None,
+            'column_structure': data.get('column_structure', ['DESCRIPTION', 'UNIT', 'QTY', 'RATE']),
+            'items': data['items'],
+            'subtotal': subtotal,
+            'vat_percentage': vat_percentage,
+            'vat_amount': vat_amount,
+            'grand_total': grand_total,
+            'payment_terms': data.get('terms', {}).get('payment', ''),
+            'delivery_terms': data.get('terms', {}).get('delivery', ''),
+            'notes': data.get('notes', ''),
+            'status': 'draft'
+        }
+        
+        # Save to database
+        lpo = LPOService.create_lpo(lpo_data)
+        
+        # TODO: In production, call n8n workflow to generate PDF
+        # response = requests.post(
+        #     'https://your-n8n-instance.com/webhook/lpo-generate-pdf',
+        #     json={'lpo_id': lpo.id, 'lpo_data': lpo.to_dict()}
+        # )
+        # pdf_url = response.json()['pdf_url']
+        
+        # For now, generate PDF using existing service
+        from services.lpo_pdf_generator import LPOPDFGenerator
+        
+        pdf_filename = f"{lpo_number.replace('/', '_')}.pdf"
+        pdf_path = os.path.join('uploads', 'lpos', pdf_filename)
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+        
+        # Generate PDF
+        LPOPDFGenerator.generate_pdf(lpo, pdf_path)
+        
+        # Update LPO with PDF path
+        lpo.pdf_path = pdf_path
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'lpo_number': lpo_number,
+            'lpo_id': lpo.id,
+            'pdf_url': f'/api/n8n/lpo-download/{lpo.id}',
+            'pdf_path': pdf_path,
+            'totals': {
+                'subtotal': subtotal,
+                'vat_amount': vat_amount,
+                'grand_total': grand_total
+            },
+            'message': 'LPO generated successfully'
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to generate LPO',
+            'message': str(e)
+        }), 500
+
+
+@n8n_bp.route('/lpo-download/<int:lpo_id>', methods=['GET'])
+def lpo_download(lpo_id):
+    """
+    Download LPO PDF file.
+    
+    Parameters:
+        lpo_id: LPO database ID
+    
+    Returns:
+        PDF file for download
+    """
+    try:
+        from models.lpo import LPO
+        
+        lpo = LPO.query.get(lpo_id)
+        
+        if not lpo:
+            return jsonify({
+                'success': False,
+                'error': 'LPO not found'
+            }), 404
+        
+        if not lpo.pdf_path or not os.path.exists(lpo.pdf_path):
+            return jsonify({
+                'success': False,
+                'error': 'PDF file not found'
+            }), 404
+        
+        return send_file(
+            lpo.pdf_path,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"{lpo.lpo_number.replace('/', '_')}.pdf"
+        )
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to download PDF',
+            'message': str(e)
+        }), 500

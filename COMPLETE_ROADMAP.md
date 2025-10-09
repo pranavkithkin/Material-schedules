@@ -16,7 +16,11 @@
 - **Phase 4:** Conversational Chat - 100% ✅
 
 ### 🔄 In Progress:
-- **Phase 5:** Automated LPO Generation System - 0% 📋 PLANNING
+- **Phase 5:** Integrated LPO System with n8n - 75% 🎨 ALMOST DONE!
+  - Step 5.1: Dedicated LPO Page - ✅ COMPLETE
+  - Step 5.2: n8n Webhook Endpoints - ✅ COMPLETE
+  - Step 5.3: Dynamic Form Logic - ✅ COMPLETE
+  - Step 5.4: Integration & Testing (0/1 hour) - NEXT
 
 ### ⏳ Remaining:
 - **Phase 6:** Advanced Analytics & Predictions - 0%
@@ -378,155 +382,171 @@ Use SQLAlchemy queries to fetch accurate data before sending to AI.
 
 ---
 
-### PHASE 5: Automated LPO Generation System (Week 5) 📋 PLANNING
-**Goal:** Streamline LPO creation from supplier quotes with AI extraction
+### PHASE 5: Integrated LPO System with n8n (Week 5) � IN PROGRESS
+**Goal:** Dashboard-integrated LPO creation with n8n AI extraction
 
-#### Step 5.1: Core LPO System 📋 NEXT
+> **Architecture Change:** Integrated approach using existing dashboard + n8n webhooks
+> **See:** `PHASE_5_REVISED_PLAN.md` for detailed implementation
+
+#### Step 5.1: Dashboard UI Integration (2 hours) � IN PROGRESS
 **What to ask Claude:**
 ```
-"Create automated LPO generation system:
+"Add LPO functionality to existing chat dashboard:
 
-1. Database Model (models/lpo.py):
-   - LPO number (auto-generated: PKP-LPO-6001-2025-XXX)
-   - LPO date, project, supplier details
-   - Quotation ref, date, items table (JSON)
-   - Payment terms, delivery date
-   - Status (Draft/Issued/Acknowledged/Completed/Void)
-   - PDF path, created by, timestamps
+1. Modify templates/chat.html:
+   - Add 'Add New LPO' button above chatbot
+   - Create modal/drawer with sections:
+     * File upload area (drag-drop for PDF/DOCX/XLSX)
+     * Loading state during extraction
+     * Editable form with prefilled data
+     * Action buttons (Generate LPO, Save Draft, Cancel)
 
-2. Routes (routes/lpo.py):
-   POST /api/lpo/extract - Extract from quote
-   POST /api/lpo/create - Create LPO
-   GET  /api/lpo/<id> - Get details
-   GET  /api/lpo/<id>/pdf - Download PDF
-   PUT  /api/lpo/<id> - Update LPO
-   POST /api/lpo/<id>/issue - Mark as issued
+2. Modal Sections:
+   - Header: LPO details (auto-generated number, date)
+   - Supplier: Name, TRN, address, contact
+   - Project: Name, location, consultant
+   - Quote: Reference, date
+   - Items: Dynamic table (add/remove rows, auto-calculate)
+   - Totals: Subtotal, VAT (5%), Grand Total
+   - Terms: Payment, delivery, warranty
 
-3. Service (services/lpo_service.py):
-   - generate_lpo_number()
-   - create_lpo(data)
-   - generate_pdf(lpo_id)
-   - calculate_totals(items)
+3. Styling:
+   - Match existing dashboard theme (Tailwind CSS)
+   - Purple/blue gradients (consistent with nav)
+   - Smooth animations and transitions
+   - Responsive design (mobile-friendly)
+   - Card-based layout with shadows
 
-4. Templates:
-   - lpo_create.html - Create/upload quote
-   - lpo_list.html - List all LPOs
-   - lpo_view.html - View LPO details
-
-Required LPO fields:
-- LPO No, Date, Project, Supplier, Quote Ref, Quote Date
-- Address, TRN, Contact Person, Contact Number
-- Items table (description, qty, unit, rate, amount)
-- Subtotal, VAT (5%), Grand Total
-- Payment Terms, Delivery Date
-
-Include manual entry workflow first, AI extraction in next step."
+Reference sample LPO layout from: sample documents/sample lpo/sample single page.pdf"
 ```
 
-**✅ Deliverable:** Manual LPO creation working with PDF generation
+**✅ Deliverable:** LPO button and modal in chat dashboard
 
-#### Step 5.2: AI Quote Extraction 📋
+#### Step 5.2: n8n Webhook Endpoints (1 hour) 📋
 **What to ask Claude:**
 ```
-"Add AI extraction to LPO system:
+"Add LPO endpoints to routes/n8n_webhooks.py:
 
-1. Extraction Service (services/lpo_extraction.py):
-   - extract_from_pdf(file_path) - Extract text
-   - parse_with_gpt4(text) - Use GPT-4 to identify fields
-   - extract_items_table(text) - Parse items
-   - Return data + confidence scores
+1. POST /api/n8n/lpo-extract-quote:
+   - Receive uploaded quote file (PDF/DOCX/XLSX)
+   - Save to temporary location
+   - Call n8n workflow for AI extraction
+   - Return structured JSON:
+     {
+       supplier: {name, trn, address, tel, contact},
+       quote_ref, quote_date,
+       column_structure: ["MAKE", "CODE", "DESCRIPTION", "UNIT", "QTY", "RATE"],
+       items: [{number, make, code, description, unit, quantity, rate}],
+       terms: {delivery, payment},
+       confidence: 95
+     }
 
-2. GPT-4 Prompt:
-   Extract these fields from supplier quotation:
-   - Supplier name, address, TRN
-   - Contact person, phone
-   - Quote ref, date
-   - Items (description, qty, unit, price)
-   - Payment terms, delivery time
-   Return JSON with confidence scores (0-100)
+2. POST /api/n8n/lpo-generate-pdf:
+   - Receive finalized LPO form data
+   - Generate LPO number (LPO/PKP/YYYY/NNNN)
+   - Save to database (models/lpo.py)
+   - Call n8n workflow for PDF generation
+   - Return downloadable PDF file
 
-3. Review UI:
-   - Show extracted fields with confidence
-   - Green checkmark (>90%), yellow warning (<90%)
-   - Allow editing before PDF generation
-   - Highlight missing fields
+3. Error Handling:
+   - Invalid file format
+   - n8n workflow failures
+   - Low confidence extractions
+   - Missing required fields
 
-4. Dependencies:
-   - PyPDF2 or pdfplumber (PDF text extraction)
-   - pytesseract (OCR for images)
-   - openai (GPT-4 API)
-
-Include upload → extract → review → edit → generate workflow."
+Include proper request/response validation and logging."
 ```
 
-**✅ Deliverable:** Upload quote PDF → Auto-extract → Generate LPO
+**✅ Deliverable:** Two working n8n webhook endpoints
 
-#### Step 5.3: Professional PDF Template 📋
+#### Step 5.3: Dynamic Form Logic (2 hours) 📋
 **What to ask Claude:**
 ```
-"Create professional LPO PDF template:
+"Create JavaScript logic for LPO form in templates/chat.html:
 
-1. PDF Generator (services/pdf_generator.py):
-   - Use WeasyPrint or ReportLab
-   - Professional layout with company branding
-   - Items table with proper formatting
-   - Calculations (subtotal, VAT, total)
-   - Terms & conditions section
-   - Signature section
+1. Reusable Components:
+   - LPOForm class (manage form state)
+   - ItemsTable class (dynamic rows, calculations)
+   - FileUploader class (drag-drop, progress)
 
-2. Template Design:
-   - Company logo and header
-   - LPO number and date prominent
-   - Supplier details section
-   - Items table with borders
-   - Payment terms and delivery date
-   - Multi-page support
-   - Print-ready format
+2. Workflow Functions:
+   - handleFileUpload(file) - Upload to n8n endpoint
+   - prefillForm(data) - Populate from extraction
+   - renderItemsTable(items, columns) - Dynamic columns
+   - addItem() / removeItem(index) - Row management
+   - calculateTotals() - Auto-calculate subtotal/VAT/total
+   - validateForm() - Check required fields
+   - generateLPO() - Send to n8n, download PDF
 
-3. Branding:
-   - PKP Contracting LLC logo
-   - Company colors
-   - Professional fonts
-   - Clean, organized layout
+3. Dynamic Columns Feature:
+   - Adapt table to column_structure from extraction
+   - Support various formats:
+     * Steel: MAKE, CODE, DESCRIPTION
+     * Electrical: CODE, DESCRIPTION (no MAKE)
+     * Services: DESCRIPTION only
+   - No forced columns - clean output
 
-Provide HTML/CSS template or ReportLab code for PDF generation."
+4. UX Features:
+   - Loading states with spinners
+   - Success/error toast messages
+   - Form validation with highlights
+   - Keyboard shortcuts (Enter to add row)
+   - Auto-save to localStorage (draft recovery)
+
+Include proper async/await error handling and user feedback."
 ```
 
-**✅ Deliverable:** Professional, branded LPO PDFs
+**✅ Deliverable:** Fully functional form with dynamic columns
 
-#### Step 5.4: Integration & Workflow 📋
+#### Step 5.4: Integration & Testing (1 hour) 📋
 **What to ask Claude:**
 ```
-"Complete LPO system integration:
+"Complete LPO system testing:
 
-1. Link to Purchase Orders:
-   - Create PurchaseOrder record from LPO
-   - Link LPO to existing PO tracking
-   - Update delivery tracking
+1. End-to-End Testing:
+   - Test with sample quotes (steel, electrical, services)
+   - Verify dynamic columns adapt correctly
+   - Test PDF generation with different formats
+   - Mobile responsive testing
+   - Cross-browser compatibility
 
-2. Status Workflow:
-   - Draft → Edit/save
-   - Issued → Mark as sent to supplier
-   - Acknowledged → Supplier confirms
-   - Completed → Delivery done
-   - Void → Cancel LPO
+2. Integration Testing:
+   - Link LPO to Purchase Orders
+   - Status workflow (draft → issued → acknowledged)
+   - Database persistence
+   - File storage and retrieval
 
-3. Additional Features:
-   - Email LPO to supplier (Flask-Mail)
-   - Search/filter LPOs (by supplier, date, status)
-   - LPO analytics in dashboard
-   - Export LPO list to Excel
+3. Error Scenarios:
+   - Invalid file uploads
+   - n8n extraction failures
+   - Network timeouts
+   - Missing required fields
+   - Duplicate LPO numbers
 
-4. Tests:
-   - test_lpo_service.py
-   - test_lpo_extraction.py
-   - test_pdf_generator.py
+4. Future Extensions (Modular):
+   - Approval workflow (add later)
+   - Email dispatch to suppliers (add later)
+   - Cloud storage integration (add later)
+   - LPO list view with filters (add later)
 
-Include complete workflow from quote upload to delivery tracking."
+Test with actual supplier quotes from different trades."
 ```
 
-**✅ Deliverable:** Fully integrated LPO system with status tracking
-**Status:** 📋 PLANNING - See PHASE_5_LPO_GENERATION_PLAN.md for details
+**✅ Deliverable:** Production-ready integrated LPO system
+**Status:** 🔄 IN PROGRESS - Step 5.1 starting
+
+**Total Time:** ~6 hours
+- Step 5.1: 2 hours (UI Integration)
+- Step 5.2: 1 hour (n8n Endpoints)
+- Step 5.3: 2 hours (Form Logic)
+- Step 5.4: 1 hour (Testing)
+
+**Key Benefits:**
+- ✅ Integrated into existing dashboard
+- ✅ Uses proven n8n architecture
+- ✅ Modular for future extensions
+- ✅ Clean, maintainable code
+- ✅ Reusable components
 
 ---
 
