@@ -114,11 +114,6 @@
                         <span class="font-medium">Deliveries</span>
                     </a>
                     
-                    <a href="/lpo" class="flex items-center space-x-2 px-4 py-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition group">
-                        <i class="fas fa-file-contract text-lg group-hover:text-pkp-gold"></i>
-                        <span class="font-medium">LPO</span>
-                    </a>
-                    
                     <!-- Hamburger Menu Button (Desktop - for secondary items only) -->
                     <div class="relative">
                         <button 
@@ -286,14 +281,6 @@
     </main>
 
     <!-- Floating Action Buttons (Bottom Right) -->
-    <!-- LPO Button (Above Chat) -->
-    <a href="/lpo" class="fixed bottom-24 right-6 bg-gradient-to-r from-pkp-green to-green-600 hover:from-pkp-gold hover:to-yellow-500 text-white p-4 rounded-full shadow-2xl transition-all duration-300 z-40 group flex items-center justify-center">
-        <i class="fas fa-plus text-2xl group-hover:rotate-90 transition-transform duration-300"></i>
-        <span class="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap font-medium shadow-lg">
-            Create New LPO
-        </span>
-    </a>
-    
     <!-- Chat Button -->
     <button id="chat-float-btn" onclick="openChatModal()" class="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-4 rounded-full shadow-2xl transition-all duration-300 z-40">
         <i class="fas fa-comments text-2xl"></i>
@@ -372,7 +359,6 @@
                     <div class="mt-2">
                         <label class="text-xs text-gray-600 font-medium">Document Type:</label>
                         <select id="chat-doc-type" class="mt-1 w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="purchase_order">Purchase Order (LPO)</option>
                             <option value="delivery_note">Delivery Note</option>
                             <option value="invoice">Invoice/Payment Receipt</option>
                         </select>

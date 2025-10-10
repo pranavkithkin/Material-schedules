@@ -1,0 +1,11 @@
+=== BACKUP LIST - LPO Files Being Deleted Fri Oct 10 11:39:45 AM +04 2025 ===
+
+Python Files:
+-rwxrwxrwx 1 pranvkithkin pranvkithkin  7788 Oct  8 16:51 models/lpo.py
+-rwxrwxrwx 1 pranvkithkin pranvkithkin  9924 Oct  9 18:30 routes/lpo.py
+-rwxrwxrwx 1 pranvkithkin pranvkithkin  8342 Oct  8 16:46 services/lpo_pdf_generator.py
+-rwxrwxrwx 1 pranvkithkin pranvkithkin 13541 Oct  8 16:46 services/lpo_service.py
+
+Templates:
+-rwxrwxrwx 1 pranvkithkin pranvkithkin 40659 Oct  9 18:23 templates/lpo.html
+-rwxrwxrwx 1 pranvkithkin pranvkithkin 12399 Oct  8 17:06 templates/lpo_template.html
