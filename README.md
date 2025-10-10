@@ -1,8 +1,8 @@
-# Material Delivery Dashboard
+# 🚀 PKP Material Delivery Dashboard
 
 AI-powered delivery schedule tracking system for construction projects with n8n automation integration.
 
-## Features
+## ✨ Features
 
 - **Dual-Mode Operation**: Manual data entry + AI-powered automation
 - **Material Tracking**: Track 35+ material types with approval status
@@ -13,8 +13,46 @@ AI-powered delivery schedule tracking system for construction projects with n8n 
 - **Natural Language Chat**: Query your data using plain English
 - **n8n Integration**: Automated workflows for email/PDF processing
 - **Audit Trail**: Complete tracking of all human and AI updates
+- **Docker Support**: Full containerization for easy deployment
 
-## Quick Start
+## 🐳 Quick Start with Docker (Recommended)
+
+### Local Development
+```bash
+# Clone repository
+git clone https://github.com/pranavkithkin/Material-schedules.git
+cd Material-schedules
+
+# Copy environment template
+cp .env.docker .env
+
+# Edit .env with your API keys
+nano .env
+
+# Start with Docker Compose
+docker compose up -d
+
+# Access dashboard
+open http://localhost:5001
+```
+
+### Production Deployment (VPS)
+```bash
+# On your VPS (Ubuntu recommended)
+git clone https://github.com/pranavkithkin/Material-schedules.git
+cd Material-schedules
+
+# Run automated deployment
+chmod +x deploy.sh setup-ssl.sh
+./deploy.sh
+
+# Configure SSL certificates
+./setup-ssl.sh
+```
+
+See **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** for complete cloud deployment instructions.
+
+## 🛠️ Manual Installation (Without Docker)
 
 1. **Install Dependencies**
 ```bash
@@ -39,7 +77,7 @@ python app.py
 
 5. **Access Dashboard**
 ```
-http://localhost:5000
+http://localhost:5001
 ```
 
 ## Project Structure
