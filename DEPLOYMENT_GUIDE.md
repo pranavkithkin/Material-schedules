@@ -15,7 +15,25 @@
 
 ## 🌥️ Cloud Provider Recommendations
 
-### **BEST FOR YOU: Hetzner Cloud** ⭐ RECOMMENDED
+### **BEST FOR TESTING: Google Cloud Platform (GCP)** ⭐ FREE FOR 3 MONTHS
+**Why GCP for Testing?**
+- ✅ **$300 FREE credits** for 90 days (3 months)
+- ✅ **No charges** during trial period
+- ✅ **Full GCP access** - all services available
+- ✅ **Global infrastructure** - excellent performance worldwide
+- ✅ **Easy migration** - can move to Hetzner after trial
+
+**Pricing:**
+- **e2-medium** (2 vCPU, 4GB RAM, 30GB SSD): ~$25/month (FREE with credits!)
+- **e2-standard-2** (2 vCPU, 8GB RAM, 50GB SSD): ~$50/month (FREE with credits!)
+- After 3 months: Move to Hetzner to save costs, or continue at ~$25-50/month
+
+**Get Started:** https://cloud.google.com/free  
+**Complete Guide:** See [DEPLOYMENT_GCP.md](DEPLOYMENT_GCP.md)
+
+---
+
+### **BEST FOR PRODUCTION: Hetzner Cloud** ⭐ RECOMMENDED
 **Why Hetzner?**
 - ✅ **Excellent Price/Performance** - Best value in the market
 - ✅ **Multiple Projects** - Can host n8n, dashboard, and hobby projects

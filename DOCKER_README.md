@@ -53,15 +53,21 @@ chmod +x deploy.sh setup-ssl.sh
 
 ---
 
-## 🌥️ Recommended Cloud Provider: Hetzner
+## 🌥️ Cloud Provider Options
 
-**Why Hetzner?**
-- ✅ Best price/performance ratio
-- ✅ €11.66/month for 2 vCPU, 8GB RAM, 80GB SSD
-- ✅ Can host dashboard + n8n + 5-10 more projects
-- ✅ Total cost: ~$13.60/month (vs $60-135/month with managed services)
+### Google Cloud Platform (FREE for 3 Months!) ⭐ BEST FOR TESTING
+- **$300 free credits** for 90 days
+- No charges during trial
+- **Get Started:** https://cloud.google.com/free
+- **Complete Guide:** [DEPLOYMENT_GCP.md](DEPLOYMENT_GCP.md)
+- **Quick Deploy:** Run `./deploy-gcp.sh` (automated setup)
 
-**Sign up:** https://www.hetzner.com/cloud
+### Hetzner Cloud ⭐ BEST FOR PRODUCTION
+- **€11.66/month** for 2 vCPU, 8GB RAM, 80GB SSD
+- Can host dashboard + n8n + 5-10 more projects
+- Total cost: ~$13.60/month (vs $60-135/month with managed services)
+- **Get Started:** https://www.hetzner.com/cloud
+- **Complete Guide:** [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
 
 ---
 

@@ -15,6 +15,18 @@ AI-powered delivery schedule tracking system for construction projects with n8n 
 - **Audit Trail**: Complete tracking of all human and AI updates
 - **Docker Support**: Full containerization for easy deployment
 
+## 🌥️ Cloud Deployment Options
+
+### Option 1: Google Cloud Platform (FREE for 3 months!)
+- Get $300 free credits for 90 days
+- Perfect for testing and initial deployment
+- See **[DEPLOYMENT_GCP.md](DEPLOYMENT_GCP.md)** for complete guide
+
+### Option 2: Hetzner Cloud (Best for production)
+- Only €11.66/month (~$12.60) for production server
+- Can host dashboard + n8n + multiple projects
+- See **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** for details
+
 ## 🐳 Quick Start with Docker (Recommended)
 
 ### Local Development
