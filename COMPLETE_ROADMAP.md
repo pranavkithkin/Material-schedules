@@ -20,8 +20,11 @@
   - **Reason:** Feature moved to separate workflow as basic company function
   - **Note:** All LPO files and code removed from project (Oct 10, 2025)
 
+### 🔄 In Progress:
+- **Phase 6:** SMB File Server Integration - 0% 🆕 STARTING NOW!
+
 ### ⏳ Remaining:
-- **Phase 6:** Advanced Analytics & Predictions - 0%
+- **Phase 7:** Advanced Analytics & Predictions - 0%
 
 ---
 
@@ -553,7 +556,269 @@ Test with actual supplier quotes from different trades."
 
 ---
 
-### PHASE 6: Advanced Analytics & Predictions (Week 6) ⏳ PENDING
+### PHASE 6: SMB File Server Integration (Week 6) 🔄 IN PROGRESS
+**Goal:** Enterprise-level file management with office SMB server integration
+
+> **Business Need:** Central file repository for all project documents (POs, deliveries, submittals, invoices)
+> stored on office SMB server with dashboard access for easy upload/download/organization
+
+#### Step 6.1: SMB Service & Core Infrastructure (2 hours) 🔄 IN PROGRESS
+**What to implement:**
+```
+Enterprise-grade SMB/CIFS file server integration
+
+1. SMB Service (services/smb_service.py):
+   - SMBConnection with NT LM v2 authentication
+   - Connection pooling and auto-reconnect
+   - Error handling and logging
+   - Support for:
+     * Browse folders/files with metadata
+     * Upload files with progress tracking
+     * Download files with streaming
+     * Delete files with confirmation
+     * Create folders with proper permissions
+     * Get hierarchical folder structure
+
+2. API Routes (routes/smb.py):
+   - GET /api/smb/test-connection - Test server connectivity
+   - GET /api/smb/browse?path=xxx - List folders and files
+   - GET /api/smb/folders?path=xxx - List folders only
+   - GET /api/smb/files?path=xxx - List files with metadata
+   - GET /api/smb/structure?path=xxx&max_depth=3 - Get tree structure
+   - POST /api/smb/upload - Upload file to server
+   - GET /api/smb/download?path=xxx&filename=yyy - Download file
+   - DELETE /api/smb/delete - Delete file
+   - POST /api/smb/create-folder - Create new folder
+
+3. Configuration (.env):
+   SMB_SERVER_IP=192.168.1.100
+   SMB_SERVER_NAME=FILE-SERVER
+   SMB_SHARE_NAME=Projects
+   SMB_USERNAME=admin
+   SMB_PASSWORD=secure-password
+   SMB_DOMAIN=WORKGROUP
+   SMB_BASE_PATH=PKP_Projects
+
+4. Dependencies:
+   - pysmb==1.2.9.1 (Python SMB/CIFS library)
+```
+
+**✅ Deliverable:** Working SMB backend service with API endpoints
+**Status:** 🔄 IN PROGRESS
+
+#### Step 6.2: File Browser UI (3 hours) ⏳ NEXT
+**What to implement:**
+```
+Modern file browser interface integrated into dashboard
+
+1. File Browser Page (templates/files.html):
+   - Breadcrumb navigation (Home > Projects > Villa_123)
+   - Two-column layout:
+     * Left: Folder tree navigation
+     * Right: File grid/list view
+   
+2. Features:
+   - Folder Navigation:
+     * Expandable folder tree
+     * Click to navigate
+     * Create new folder button
+     * Current path display
+   
+   - File Grid View:
+     * File icons by type (PDF, Excel, Word, Image)
+     * File name, size, date modified
+     * Action buttons (Download, Delete, Preview)
+     * Multi-select for batch operations
+     * Search/filter files
+   
+   - Upload Interface:
+     * Drag-and-drop upload zone
+     * File picker button
+     * Upload progress bars
+     * Multiple file upload support
+     * Project/folder selector
+   
+   - Quick Actions:
+     * "Upload to Current Folder" button
+     * "Create New Folder" modal
+     * "Delete Selected" with confirmation
+     * "Download Selected" as ZIP
+
+3. Styling (PKP Theme):
+   - Green/Gold color scheme (#0F7C3C / #D4AF37)
+   - Card-based layout with shadows
+   - Smooth animations and transitions
+   - Responsive design (mobile-friendly)
+   - Loading states and spinners
+   - Toast notifications for actions
+
+4. JavaScript (static/js/files.js):
+   - FileManager class for state management
+   - AJAX calls to SMB API endpoints
+   - Drag-and-drop file upload handler
+   - Folder tree expand/collapse
+   - File preview modal (PDFs, images)
+   - Search and filter logic
+   - Error handling with user feedback
+```
+
+**✅ Deliverable:** Full-featured file browser UI
+**Status:** ⏳ PENDING
+
+#### Step 6.3: Project Integration (2 hours) ⏳
+**What to implement:**
+```
+Link SMB files to dashboard records
+
+1. Database Changes:
+   - Add smb_folder_path to Materials, PurchaseOrders, Deliveries, Payments
+   - Track which files are linked to which records
+   
+2. Enhanced Upload Flow:
+   - When uploading document in Materials/PO/Delivery pages:
+     * Option: "Save to Local Only" or "Save to SMB Server"
+     * If SMB: Select project folder or auto-create based on PO number
+     * Store SMB path in database for easy access
+   
+3. File Linking:
+   - "View Files" button on each record
+   - Opens file browser filtered to that record's folder
+   - "Attach from Server" - Browse SMB to link existing files
+   - "Quick Upload" - Direct upload to record's folder
+
+4. Auto Organization:
+   - Create folder structure automatically:
+     PKP_Projects/
+     ├── Villa_Projects/
+     │   ├── Villa_123/
+     │   │   ├── PO_Documents/
+     │   │   ├── Delivery_Notes/
+     │   │   ├── Invoices/
+     │   │   └── Material_Submittals/
+     
+5. Smart Features:
+   - Auto-suggest folder based on context
+   - Duplicate detection (same filename in folder)
+   - Version control (append timestamp if duplicate)
+   - Bulk operations (upload multiple files to project)
+```
+
+**✅ Deliverable:** Integrated file management across dashboard
+**Status:** ⏳ PENDING
+
+#### Step 6.4: Advanced Features (2 hours) ⏳
+**What to implement:**
+```
+Enterprise features for productivity
+
+1. File Preview:
+   - In-browser PDF viewer
+   - Image preview modal
+   - Document metadata display
+   - Quick view without download
+
+2. Search & Filter:
+   - Global file search across all projects
+   - Filter by:
+     * File type (PDF, Excel, Word, Image)
+     * Date range (uploaded, modified)
+     * Project name
+     * Size range
+   - Recent files list
+   - Favorites/starred files
+
+3. Batch Operations:
+   - Select multiple files
+   - Bulk download as ZIP
+   - Bulk move to another folder
+   - Bulk delete with confirmation
+
+4. Permissions & Security:
+   - Read-only mode for certain users
+   - Admin-only delete permissions
+   - Audit log (who uploaded/deleted what)
+   - File access history
+
+5. Notifications:
+   - "New file uploaded to Project X"
+   - "File deleted by User Y"
+   - Email notifications for important uploads
+   - Activity feed on dashboard
+
+6. Performance:
+   - Lazy loading for large folders
+   - Thumbnail caching
+   - Connection pooling
+   - Retry logic for network failures
+```
+
+**✅ Deliverable:** Production-ready enterprise file management
+**Status:** ⏳ PENDING
+
+#### Step 6.5: Testing & Documentation (1 hour) ⏳
+**What to test:**
+```
+Comprehensive testing and documentation
+
+1. Functionality Testing:
+   - Upload various file types (PDF, Excel, Word, images)
+   - Download files and verify integrity
+   - Create nested folder structures
+   - Delete files and folders
+   - Test with large files (>10MB)
+   - Test with special characters in filenames
+
+2. Error Scenarios:
+   - SMB server offline
+   - Invalid credentials
+   - Permission denied
+   - Network timeout
+   - Disk space full
+   - Duplicate filenames
+
+3. Performance Testing:
+   - Upload 100 files
+   - Browse folder with 1000+ files
+   - Concurrent users accessing server
+   - Large file downloads (100MB+)
+
+4. Documentation:
+   - SMB_SETUP_GUIDE.md
+   - Server configuration instructions
+   - Network setup (firewall, ports)
+   - Troubleshooting guide
+   - User manual for file browser
+
+5. Deployment Checklist:
+   - Configure SMB credentials in .env
+   - Test connection from server
+   - Set up folder permissions on SMB share
+   - Create base PKP_Projects folder
+   - Test from multiple workstations
+```
+
+**✅ Deliverable:** Fully tested and documented system
+**Status:** ⏳ PENDING
+
+**Total Time:** ~10 hours
+- Step 6.1: 2 hours (SMB Service & API) - 🔄 IN PROGRESS
+- Step 6.2: 3 hours (File Browser UI)
+- Step 6.3: 2 hours (Project Integration)
+- Step 6.4: 2 hours (Advanced Features)
+- Step 6.5: 1 hour (Testing & Documentation)
+
+**Key Benefits:**
+- ✅ Central file repository on office server
+- ✅ Easy access from dashboard
+- ✅ Organized folder structure by project
+- ✅ No manual file management needed
+- ✅ Secure SMB authentication
+- ✅ Enterprise-grade reliability
+- ✅ Scalable for large document volumes
+
+---
+
+### PHASE 7: Advanced Analytics & Predictions (Week 7) ⏳ PENDING
 **Goal:** Business intelligence, predictions, and advanced features
 
 #### Step 6.1: Analytics Dashboard ⏳ NEXT

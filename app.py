@@ -30,6 +30,7 @@ def create_app():
     )
     from routes.uploads import uploads_bp
     from routes.n8n_webhooks import n8n_bp
+    from routes.smb import smb_bp
     
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(materials_bp, url_prefix='/api/materials')
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(analytics_bp)  # No url_prefix, it's defined in the blueprint
     app.register_blueprint(uploads_bp)
     app.register_blueprint(n8n_bp, url_prefix='/api/n8n')
+    app.register_blueprint(smb_bp, url_prefix='/api/smb')
     
     # Create database tables
     with app.app_context():

@@ -51,6 +51,11 @@ def ai_suggestions_page():
     """AI suggestions review page"""
     return render_template('ai_suggestions.html')
 
+@dashboard_bp.route('/files')
+def files_page():
+    """SMB File Server browser page"""
+    return render_template('files.html')
+
 @dashboard_bp.route('/test-validation')
 def test_validation_page():
     """Test validation agent page (Sprint 1)"""
